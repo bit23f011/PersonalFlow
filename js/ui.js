@@ -1,8 +1,8 @@
 import { subscribe, getTasks } from "./state.js";
 import {
   addTask, updateTask, toggleTask, deleteTask, getTask,
-  getStats, getTodayTasks, getUpcomingGroups,
-  todayStr, tomorrowStr, CATEGORIES,
+  getStats, getTodayTasks, getUpcomingGroups, getCategories,
+  todayStr, tomorrowStr,
 } from "./tasks.js";
 import { filterTasks } from "./filters.js";
 import { confirmAction } from "./dialogs.js";
@@ -17,6 +17,9 @@ const CATEGORY_DOT = {
   Work: "dot-work",
   Other: "dot-other",
 };
+// Custom categories get one of the accent colours, chosen from the name
+const DOT_PALETTE = ["dot-personal", "dot-projects", "dot-learning", "dot-work"];
+const NEW_CATEGORY = "__new__";
 
 const ICON_EDIT = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 const ICON_DELETE = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>';
@@ -45,6 +48,13 @@ function escapeHtml(str) {
   ));
 }
 
+function dotClass(category) {
+  if (CATEGORY_DOT[category]) return CATEGORY_DOT[category];
+  let hash = 0;
+  for (const ch of category) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return DOT_PALETTE[hash % DOT_PALETTE.length];
+}
+
 function parseDate(dateStr) {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d);
@@ -54,14 +64,33 @@ function formatShort(dateStr) {
   return parseDate(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+// "15:30" -> "3:30 PM" (or 24h, depending on the device settings)
+function formatTime(time) {
+  const [h, m] = time.split(":").map(Number);
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function isOverdue(task) {
+  if (task.completed || !task.dueDate) return false;
+  const today = todayStr();
+  if (task.dueDate < today) return true;
+  if (task.dueDate === today && task.dueTime) {
+    const now = new Date();
+    return task.dueTime < `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  }
+  return false;
+}
+
 function dueInfo(task) {
   if (!task.dueDate) return { text: "", overdue: false };
-  if (task.dueDate === todayStr()) return { text: "Today", overdue: false };
-  if (task.dueDate === tomorrowStr()) return { text: "Tomorrow", overdue: false };
-  if (task.dueDate < todayStr() && !task.completed) {
-    return { text: `Overdue · ${formatShort(task.dueDate)}`, overdue: true };
-  }
-  return { text: formatShort(task.dueDate), overdue: false };
+
+  let day = formatShort(task.dueDate);
+  if (task.dueDate === todayStr()) day = "Today";
+  else if (task.dueDate === tomorrowStr()) day = "Tomorrow";
+
+  const time = task.dueTime ? `, ${formatTime(task.dueTime)}` : "";
+  const overdue = isOverdue(task);
+  return { text: `${overdue ? "Overdue · " : ""}${day}${time}`, overdue };
 }
 
 function groupTitle(dateStr) {
@@ -72,22 +101,32 @@ function groupTitle(dateStr) {
   });
 }
 
-// Opens Google Calendar with a prefilled all-day event for the task's due date
-function openCalendar(task) {
-  const start = task.dueDate.replace(/-/g, "");
-  const next = parseDate(task.dueDate);
-  next.setDate(next.getDate() + 1); // all-day events end on the next day
-  const end = `${next.getFullYear()}${pad(next.getMonth() + 1)}${pad(next.getDate())}`;
+const dayStamp = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+const timeStamp = (d) => `${dayStamp(d)}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
 
-  const params = new URLSearchParams({
-    action: "TEMPLATE",
-    text: task.title,
-    dates: `${start}/${end}`,
-  });
+// Opens Google Calendar with a prefilled event: timed (1 hour) if the task has a time, else all-day
+function openCalendar(task) {
+  const startDay = parseDate(task.dueDate);
+  let dates;
+
+  if (task.dueTime) {
+    const [h, m] = task.dueTime.split(":").map(Number);
+    startDay.setHours(h, m, 0, 0);
+    const end = new Date(startDay.getTime() + 60 * 60 * 1000);
+    dates = `${timeStamp(startDay)}/${timeStamp(end)}`;
+  } else {
+    const next = new Date(startDay);
+    next.setDate(next.getDate() + 1); // all-day events end on the next day
+    dates = `${dayStamp(startDay)}/${dayStamp(next)}`;
+  }
+
+  const params = new URLSearchParams({ action: "TEMPLATE", text: task.title, dates });
   if (task.description) params.set("details", task.description);
 
   window.open(`https://calendar.google.com/calendar/render?${params}`, "_blank", "noopener");
 }
+
+const categoryOption = (c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`;
 
 /* ---------- Rendering ---------- */
 
@@ -112,7 +151,7 @@ function taskRow(task) {
         ${desc}
         <div class="task-meta">
           <span class="badge badge-${task.priority}">${PRIORITY_LABEL[task.priority]}</span>
-          <span class="meta-item"><span class="dot ${CATEGORY_DOT[task.category] || "dot-other"}"></span>${escapeHtml(task.category)}</span>
+          <span class="meta-item"><span class="dot ${dotClass(task.category)}"></span>${escapeHtml(task.category)}</span>
           ${dueHtml}
         </div>
       </div>
@@ -126,6 +165,25 @@ function taskRow(task) {
 
 function emptyState(title, text) {
   return `<div class="empty"><p class="empty-title">${title}</p><p class="muted">${text}</p></div>`;
+}
+
+// Sidebar category list is generated (built-in + custom categories)
+const categoryNav = $("categoryNav");
+let categorySignature = "";
+
+function renderCategoryNav(categories) {
+  const signature = categories.join("|");
+  if (signature === categorySignature) return; // unchanged: keep the buttons (and keyboard focus)
+  categorySignature = signature;
+
+  categoryNav.innerHTML =
+    '<p class="nav-label">Categories</p>' +
+    categories
+      .map(
+        (c) =>
+          `<button class="nav-item" type="button" data-category="${escapeHtml(c)}"><span class="dot ${dotClass(c)}"></span>${escapeHtml(c)}</button>`
+      )
+      .join("");
 }
 
 function renderOverview() {
@@ -154,7 +212,7 @@ function renderOverview() {
     : emptyState("Nothing scheduled yet", "Tasks with a future or no due date will appear here.");
 }
 
-function renderList() {
+function renderList(categories) {
   const tasks = filterTasks(getTasks(), ui);
   const query = ui.query.trim();
 
@@ -171,6 +229,9 @@ function renderList() {
   });
   $("chipHigh").classList.toggle("is-active", ui.highOnly);
   $("chipHigh").setAttribute("aria-pressed", String(ui.highOnly));
+
+  $("categoryFilter").innerHTML =
+    `<option value="">All categories</option>${categories.map(categoryOption).join("")}`;
   $("categoryFilter").value = ui.category || "";
 
   if (tasks.length) {
@@ -198,6 +259,10 @@ function syncNav() {
 
 // Only the visible view is rendered
 function render() {
+  const categories = getCategories();
+  if (ui.category && !categories.includes(ui.category)) ui.category = null; // category no longer exists
+  renderCategoryNav(categories);
+
   const isList = LIST_VIEWS.includes(ui.view);
   $("viewOverview").hidden = ui.view !== "overview";
   $("viewList").hidden = !isList;
@@ -205,7 +270,7 @@ function render() {
   syncNav();
 
   if (ui.view === "overview") renderOverview();
-  else if (isList) renderList();
+  else if (isList) renderList(categories);
 }
 
 /* ---------- Navigation ---------- */
@@ -235,17 +300,51 @@ const dialog = $("taskDialog");
 const form = $("taskForm");
 let editingId = null;
 
+// Adds the "new category name" input under the category dropdown
+function setupNewCategoryField() {
+  $("fieldCategory").insertAdjacentHTML(
+    "afterend",
+    '<input class="input" id="fieldNewCategory" type="text" maxlength="30" placeholder="New category name" autocomplete="off" hidden />' +
+      '<p class="field-error" id="categoryError" hidden>Enter a category name.</p>'
+  );
+  $("fieldCategory").addEventListener("change", () => {
+    const isNew = $("fieldCategory").value === NEW_CATEGORY;
+    $("fieldNewCategory").hidden = !isNew;
+    if (!isNew) $("categoryError").hidden = true;
+    else $("fieldNewCategory").focus();
+  });
+}
+
+// The time field only works together with a date
+function syncTimeField() {
+  const hasDate = Boolean($("fieldDueDate").value);
+  $("fieldDueTime").disabled = !hasDate;
+  if (!hasDate) $("fieldDueTime").value = "";
+}
+
 function openDialog(task = null) {
   editingId = task ? task.id : null;
   $("dialogTitle").textContent = task ? "Edit Task" : "New Task";
   $("saveTaskBtn").textContent = task ? "Save Changes" : "Create Task";
   $("titleError").hidden = true;
 
+  const categories = getCategories();
+  $("fieldCategory").innerHTML =
+    categories.map(categoryOption).join("") + `<option value="${NEW_CATEGORY}">+ New category…</option>`;
+  $("fieldNewCategory").value = "";
+  $("fieldNewCategory").hidden = true;
+  $("categoryError").hidden = true;
+
+  // New tasks start in the category you are currently viewing (if any)
+  const defaultCategory = ui.category && categories.includes(ui.category) ? ui.category : "Personal";
+
   $("fieldTitle").value = task ? task.title : "";
   $("fieldDescription").value = task ? task.description : "";
   $("fieldPriority").value = task ? task.priority : "medium";
-  $("fieldCategory").value = task ? task.category : "Personal";
+  $("fieldCategory").value = task ? task.category : defaultCategory;
   $("fieldDueDate").value = task ? task.dueDate : "";
+  $("fieldDueTime").value = task ? task.dueTime || "" : "";
+  syncTimeField();
 
   dialog.showModal();
   $("fieldTitle").focus();
@@ -260,12 +359,23 @@ function onSubmit(e) {
     return;
   }
 
+  let category = $("fieldCategory").value;
+  if (category === NEW_CATEGORY) {
+    category = $("fieldNewCategory").value.trim();
+    if (!category) {
+      $("categoryError").hidden = false;
+      $("fieldNewCategory").focus();
+      return;
+    }
+  }
+
   const fields = {
     title,
     description: $("fieldDescription").value,
     priority: $("fieldPriority").value,
-    category: $("fieldCategory").value,
+    category,
     dueDate: $("fieldDueDate").value,
+    dueTime: $("fieldDueTime").value,
   };
 
   if (editingId) updateTask(editingId, fields);
@@ -309,9 +419,8 @@ async function onListClick(e) {
 /* ---------- Init ---------- */
 
 export function initUI() {
-  const options = CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
-  $("fieldCategory").innerHTML = options;
-  $("categoryFilter").innerHTML = `<option value="">All categories</option>${options}`;
+  setupNewCategoryField();
+  $("fieldDueDate").addEventListener("input", syncTimeField);
 
   // Navigation (sidebar, bottom nav, settings icon)
   document.addEventListener("click", onNavClick);

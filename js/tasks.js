@@ -1,7 +1,9 @@
 import { getTasks, commitTasks } from "./state.js";
 
 export const PRIORITIES = ["high", "medium", "low"];
-export const CATEGORIES = ["Personal", "Projects", "Learning", "Work", "Other"];
+export const BUILTIN_CATEGORIES = ["Personal", "Projects", "Learning", "Work", "Other"];
+const MAX_CATEGORY_LENGTH = 30;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
 
@@ -23,6 +25,25 @@ export function tomorrowStr() {
   return toDateStr(d);
 }
 
+/* ---------- Categories ---------- */
+
+// Built-in categories first, then custom ones (any category used by a task), A-Z
+export function getCategories() {
+  const custom = new Set();
+  getTasks().forEach((t) => {
+    if (!BUILTIN_CATEGORIES.includes(t.category)) custom.add(t.category);
+  });
+  return [...BUILTIN_CATEGORIES, ...[...custom].sort((a, b) => a.localeCompare(b))];
+}
+
+// Cleans a typed name and reuses an existing category with the same name (ignoring case)
+export function resolveCategory(name) {
+  const clean = String(name || "").replace(/\s+/g, " ").trim().slice(0, MAX_CATEGORY_LENGTH);
+  if (!clean) return "Other";
+  const existing = getCategories().find((c) => c.toLowerCase() === clean.toLowerCase());
+  return existing || clean;
+}
+
 /* ---------- CRUD ---------- */
 
 function newId() {
@@ -32,12 +53,15 @@ function newId() {
 }
 
 function normalize(fields) {
+  const dueDate = fields.dueDate || "";
   return {
     title: (fields.title || "").trim(),
     description: (fields.description || "").trim(),
     priority: PRIORITIES.includes(fields.priority) ? fields.priority : "medium",
-    category: CATEGORIES.includes(fields.category) ? fields.category : "Other",
-    dueDate: fields.dueDate || "",
+    category: resolveCategory(fields.category),
+    dueDate,
+    // A time only makes sense together with a date
+    dueTime: dueDate && TIME_RE.test(fields.dueTime || "") ? fields.dueTime : "",
   };
 }
 
@@ -77,12 +101,14 @@ export function deleteTask(id) {
 
 /* ---------- Queries ---------- */
 
+// Not done first, then by date, then by time (untimed last), then by priority
 function sortTasks(list) {
   return [...list].sort(
     (a, b) =>
       Number(a.completed) - Number(b.completed) ||
-      PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
-      (a.dueDate || "9999").localeCompare(b.dueDate || "9999")
+      (a.dueDate || "9999").localeCompare(b.dueDate || "9999") ||
+      (a.dueTime || "99:99").localeCompare(b.dueTime || "99:99") ||
+      PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]
   );
 }
 

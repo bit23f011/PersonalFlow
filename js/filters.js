@@ -1,8 +1,10 @@
 import { todayStr } from "./tasks.js";
 
 const RANK = { high: 0, medium: 1, low: 2 };
+const byDone = (a, b) => Number(a.completed) - Number(b.completed);
 const byPriority = (a, b) => RANK[a.priority] - RANK[b.priority];
 const byDate = (a, b) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999");
+const byTime = (a, b) => (a.dueTime || "99:99").localeCompare(b.dueTime || "99:99");
 
 // Which tasks belong to each view
 const VIEW_RULES = {
@@ -13,11 +15,10 @@ const VIEW_RULES = {
 };
 
 // How each view is ordered
-const defaultSort = (a, b) => Number(a.completed) - Number(b.completed) || byPriority(a, b) || byDate(a, b);
 const SORTERS = {
-  tasks: defaultSort,
-  today: defaultSort,
-  upcoming: (a, b) => byDate(a, b) || byPriority(a, b),
+  tasks: (a, b) => byDone(a, b) || byPriority(a, b) || byDate(a, b) || byTime(a, b),
+  today: (a, b) => byDone(a, b) || byDate(a, b) || byTime(a, b) || byPriority(a, b),
+  upcoming: (a, b) => byDate(a, b) || byTime(a, b) || byPriority(a, b),
   completed: (a, b) => b.updatedAt.localeCompare(a.updatedAt),
 };
 
@@ -34,5 +35,5 @@ export function filterTasks(tasks, { view = "tasks", category = null, highOnly =
         (!highOnly || t.priority === "high") &&
         (!q || `${t.title} ${t.description} ${t.category}`.toLowerCase().includes(q))
     )
-    .sort(SORTERS[view] || defaultSort);
+    .sort(SORTERS[view] || SORTERS.tasks);
 }

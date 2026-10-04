@@ -2,10 +2,11 @@ const DATA_KEY = "personalflow-data";
 const RECOVERY_KEY = "personalflow-recovery";
 const DATA_VERSION = 1;
 const MAX_RECOVERY_COPIES = 3;
+const MAX_CATEGORY_LENGTH = 30;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-// Keep these lists in sync with js/tasks.js
+// Keep in sync with js/tasks.js
 const PRIORITIES = ["high", "medium", "low"];
-const CATEGORIES = ["Personal", "Projects", "Learning", "Work", "Other"];
 
 function emptyData() {
   return {
@@ -46,10 +47,17 @@ export function saveData(data) {
   }
 }
 
+function cleanCategory(value) {
+  if (typeof value !== "string") return "Other";
+  const clean = value.replace(/\s+/g, " ").trim().slice(0, MAX_CATEGORY_LENGTH);
+  return clean || "Other";
+}
+
 /**
- * Validates data coming from outside (Google Drive now, JSON import later).
+ * Validates data coming from outside (Google Drive, JSON import).
  * Returns a clean data object, or null if anything is malformed.
  * Rejects the WHOLE document rather than silently dropping tasks.
+ * Older data without dueTime is fine: it simply gets an empty time.
  */
 export function validateData(raw) {
   if (!raw || typeof raw !== "object" || !Array.isArray(raw.tasks)) return null;
@@ -65,13 +73,16 @@ export function validateData(raw) {
     if (typeof t.title !== "string" || !t.title.trim()) return null;
 
     const createdAt = str(t.createdAt, now);
+    const dueDate = typeof t.dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.dueDate) ? t.dueDate : "";
+
     tasks.push({
       id: t.id,
       title: t.title.trim(),
       description: typeof t.description === "string" ? t.description : "",
       priority: PRIORITIES.includes(t.priority) ? t.priority : "medium",
-      category: CATEGORIES.includes(t.category) ? t.category : "Other",
-      dueDate: typeof t.dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.dueDate) ? t.dueDate : "",
+      category: cleanCategory(t.category), // custom categories are allowed
+      dueDate,
+      dueTime: dueDate && typeof t.dueTime === "string" && TIME_RE.test(t.dueTime) ? t.dueTime : "",
       completed: t.completed === true,
       createdAt,
       updatedAt: str(t.updatedAt, createdAt),
