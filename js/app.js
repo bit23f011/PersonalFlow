@@ -2,6 +2,7 @@ import { initTheme } from "./theme.js";
 import { initUI } from "./ui.js";
 import { initSync } from "./sync.js";
 import { initBackup } from "./backup.js";
+import { initNotifications } from "./notifications.js";
 
 function getGreeting(date = new Date()) {
   const hour = date.getHours();
@@ -27,6 +28,7 @@ function init() {
   initUI();
   initSync();
   initBackup();
+  initNotifications();
 }
 
 init();

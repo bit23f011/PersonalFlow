@@ -1,0 +1,14 @@
+{
+  "name": "PersonalFlow",
+  "short_name": "PersonalFlow",
+  "description": "Personal task manager with Google Drive sync",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f7f9",
+  "theme_color": "#4858A3",
+  "icons": [
+    { "src": "assets/avatar.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/avatar.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

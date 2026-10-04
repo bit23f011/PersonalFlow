@@ -26,6 +26,11 @@
   color: var(--coral);
 }
 
+/* Inputs inside settings rows (e.g. reminder time) keep their natural width */
+.setting-actions .input {
+  width: auto;
+}
+
 /* Accessibility */
 .skip-link {
   position: absolute;

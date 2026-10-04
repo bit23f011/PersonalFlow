@@ -20,6 +20,7 @@ const CATEGORY_DOT = {
 
 const ICON_EDIT = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 const ICON_DELETE = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>';
+const ICON_CALENDAR = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M12 13v4M10 15h4"/></svg>';
 
 /* ---------- UI state (not saved) ---------- */
 
@@ -35,6 +36,8 @@ const EMPTY_TEXT = {
 const ui = { view: "overview", category: null, highOnly: false, query: "" };
 
 /* ---------- Helpers ---------- */
+
+const pad = (n) => String(n).padStart(2, "0");
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => (
@@ -69,6 +72,23 @@ function groupTitle(dateStr) {
   });
 }
 
+// Opens Google Calendar with a prefilled all-day event for the task's due date
+function openCalendar(task) {
+  const start = task.dueDate.replace(/-/g, "");
+  const next = parseDate(task.dueDate);
+  next.setDate(next.getDate() + 1); // all-day events end on the next day
+  const end = `${next.getFullYear()}${pad(next.getMonth() + 1)}${pad(next.getDate())}`;
+
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: task.title,
+    dates: `${start}/${end}`,
+  });
+  if (task.description) params.set("details", task.description);
+
+  window.open(`https://calendar.google.com/calendar/render?${params}`, "_blank", "noopener");
+}
+
 /* ---------- Rendering ---------- */
 
 function taskRow(task) {
@@ -77,6 +97,9 @@ function taskRow(task) {
   const desc = task.description ? `<p class="task-desc">${escapeHtml(task.description)}</p>` : "";
   const dueHtml = due.text
     ? `<span class="meta-item${due.overdue ? " is-overdue" : ""}">${due.text}</span>`
+    : "";
+  const calendarBtn = task.dueDate
+    ? `<button class="icon-btn" type="button" data-action="calendar" title="Add to Google Calendar" aria-label="Add to Google Calendar: ${title}">${ICON_CALENDAR}</button>`
     : "";
 
   return `
@@ -94,6 +117,7 @@ function taskRow(task) {
         </div>
       </div>
       <div class="task-actions">
+        ${calendarBtn}
         <button class="icon-btn" type="button" data-action="edit" aria-label="Edit task: ${title}">${ICON_EDIT}</button>
         <button class="icon-btn" type="button" data-action="delete" aria-label="Delete task: ${title}">${ICON_DELETE}</button>
       </div>
@@ -266,6 +290,9 @@ async function onListClick(e) {
     setTimeout(() => toggleTask(id), 180);
   } else if (btn.dataset.action === "edit") {
     openDialog(getTask(id));
+  } else if (btn.dataset.action === "calendar") {
+    const task = getTask(id);
+    if (task && task.dueDate) openCalendar(task);
   } else if (btn.dataset.action === "delete") {
     const task = getTask(id);
     if (!task) return;
