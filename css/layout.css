@@ -4,6 +4,44 @@
   min-height: 100vh;
 }
 
+/* Splash screen: full logo with name, shown once per session.
+   Fixed light background on purpose: the logo text is dark. */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: #fbfbf9;
+  user-select: none;
+  transition: opacity 300ms ease;
+  /* Safety net: never block the app if JavaScript fails */
+  animation: splash-failsafe 0.01s linear 5s forwards;
+}
+
+.splash img {
+  width: min(62vw, 300px);
+  max-height: 70vh;
+  height: auto;
+  object-fit: contain;
+}
+
+.splash.is-hiding {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.no-splash .splash {
+  display: none;
+}
+
+@keyframes splash-failsafe {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
 /* Sidebar */
 .sidebar {
   position: sticky;
@@ -26,16 +64,14 @@
   padding: 0 8px;
 }
 
-/* Logo: uses assets/avatar.png, the "P" letter is hidden */
-.brand-mark {
+/* Logo: icon only (assets/favicon1.png) */
+.brand-logo {
   display: block;
   width: 32px;
   height: 32px;
   flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--accent) url("../assets/avatar.png") center / cover no-repeat;
-  color: transparent;
-  font-size: 0;
+  border-radius: 9px;
+  object-fit: contain;
 }
 
 .brand-name {

@@ -8,7 +8,6 @@ const TASK_WINDOW_MINUTES = 15; // only remind if the due time was within the la
 const supported = "Notification" in window;
 
 const $ = (id) => document.getElementById(id);
-const pad = (n) => String(n).padStart(2, "0");
 
 /* ---------- Saved settings ---------- */
 
@@ -75,7 +74,7 @@ async function showNotification(title, body, tag) {
   const options = {
     body,
     tag,
-    icon: new URL("assets/avatar.png", location.href).href,
+    icon: new URL("assets/favicon1.png", location.href).href,
   };
   try {
     const reg = await getRegistration();

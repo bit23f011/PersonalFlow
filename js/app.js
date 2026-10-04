@@ -4,6 +4,9 @@ import { initSync } from "./sync.js";
 import { initBackup } from "./backup.js";
 import { initNotifications } from "./notifications.js";
 
+const SPLASH_KEY = "personalflow-splash";
+const SPLASH_MIN_MS = 1000; // the splash stays visible at least this long after the page starts loading
+
 function getGreeting(date = new Date()) {
   const hour = date.getHours();
   if (hour < 12) return "Good morning, let's make today productive.";
@@ -22,6 +25,28 @@ function renderHeader() {
   });
 }
 
+// Fades the splash out (once per session) after the app is ready
+function hideSplash() {
+  const splash = document.getElementById("splash");
+  if (!splash) return;
+
+  if (document.documentElement.classList.contains("no-splash")) {
+    splash.remove(); // already shown in this session
+    return;
+  }
+
+  const wait = Math.max(0, SPLASH_MIN_MS - performance.now());
+  setTimeout(() => {
+    splash.classList.add("is-hiding");
+    setTimeout(() => splash.remove(), 400);
+    try {
+      sessionStorage.setItem(SPLASH_KEY, "1");
+    } catch {
+      // private mode: the splash will simply show again next time
+    }
+  }, wait);
+}
+
 function init() {
   initTheme();
   renderHeader();
@@ -35,6 +60,8 @@ function init() {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") renderHeader();
   });
+
+  hideSplash();
 }
 
 init();
