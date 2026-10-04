@@ -9,7 +9,7 @@ const SYNC_KEY = "personalflow-sync";
 const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 const CSV_COLUMNS = [
   "id", "title", "description", "priority", "category",
-  "dueDate", "completed", "createdAt", "updatedAt",
+  "dueDate", "dueTime", "completed", "createdAt", "updatedAt",
 ];
 
 const $ = (id) => document.getElementById(id);

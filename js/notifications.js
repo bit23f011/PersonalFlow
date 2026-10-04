@@ -2,10 +2,13 @@ import { getTasks } from "./state.js";
 import { getTodayTasks, todayStr, tomorrowStr } from "./tasks.js";
 
 const KEY = "personalflow-notify"; // per device (permission is per device too)
+const NOTIFIED_KEY = "personalflow-notified"; // which timed tasks were already announced
 const DEFAULTS = { enabled: false, time: "09:00", lastDate: "" };
+const TASK_WINDOW_MINUTES = 15; // only remind if the due time was within the last 15 minutes
 const supported = "Notification" in window;
 
 const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, "0");
 
 /* ---------- Saved settings ---------- */
 
@@ -25,6 +28,23 @@ function saveSettings(settings) {
   }
 }
 
+function loadNotified() {
+  try {
+    const value = JSON.parse(localStorage.getItem(NOTIFIED_KEY));
+    return value && typeof value === "object" ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveNotified(map) {
+  try {
+    localStorage.setItem(NOTIFIED_KEY, JSON.stringify(map));
+  } catch (err) {
+    console.error("Could not save reminder history", err);
+  }
+}
+
 function timePassed(time) {
   const [h, m] = time.split(":").map(Number);
   const now = new Date();
@@ -34,6 +54,11 @@ function timePassed(time) {
 // If today's reminder time already passed, the first reminder is tomorrow
 function armToday(settings) {
   settings.lastDate = timePassed(settings.time) ? todayStr() : "";
+}
+
+function formatTime(time) {
+  const [h, m] = time.split(":").map(Number);
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 /* ---------- Showing notifications ---------- */
@@ -83,10 +108,10 @@ function buildSummary() {
   return { title, body: lines.join("\n") };
 }
 
-/* ---------- Daily reminder check ---------- */
+/* ---------- Reminder checks (run every minute while the app is alive) ---------- */
 
-function checkReminder() {
-  if (!supported || Notification.permission !== "granted") return;
+// Daily summary at the chosen time (or when the app is opened after that time)
+function checkDailyReminder() {
   const settings = loadSettings();
   if (!settings.enabled) return;
 
@@ -99,6 +124,46 @@ function checkReminder() {
 
   const summary = buildSummary();
   if (summary) showNotification(summary.title, summary.body, "personalflow-daily");
+}
+
+// A notification at the due time of each timed task
+function checkTaskReminders() {
+  if (!loadSettings().enabled) return;
+
+  const now = new Date();
+  const today = todayStr();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const tasks = getTasks();
+  const notified = loadNotified();
+
+  const toRemind = tasks.filter((t) => {
+    if (t.completed || t.dueDate !== today || !t.dueTime) return false;
+    const [h, m] = t.dueTime.split(":").map(Number);
+    const minutesAgo = nowMinutes - (h * 60 + m);
+    if (minutesAgo < 0 || minutesAgo > TASK_WINDOW_MINUTES) return false;
+    return notified[t.id] !== `${t.dueDate} ${t.dueTime}`; // not announced yet for this date and time
+  });
+  if (!toRemind.length) return;
+
+  // Remember first (so overlapping checks never repeat), and forget deleted tasks
+  const ids = new Set(tasks.map((t) => t.id));
+  Object.keys(notified).forEach((id) => {
+    if (!ids.has(id)) delete notified[id];
+  });
+  toRemind.forEach((t) => {
+    notified[t.id] = `${t.dueDate} ${t.dueTime}`;
+  });
+  saveNotified(notified);
+
+  toRemind.forEach((t) => {
+    showNotification(`Due now: ${t.title}`, `${formatTime(t.dueTime)} • ${t.category}`, `personalflow-task-${t.id}`);
+  });
+}
+
+function tick() {
+  if (!supported || Notification.permission !== "granted") return;
+  checkDailyReminder();
+  checkTaskReminders();
 }
 
 /* ---------- Settings UI ---------- */
@@ -122,7 +187,9 @@ function renderUI() {
     $("notifyMessage").textContent =
       "Notifications are blocked for this site. Allow them in your browser's site settings, then turn reminders on.";
   } else {
-    $("notifyMessage").textContent = on ? `Daily reminder is set for ${settings.time}.` : "Reminders are off.";
+    $("notifyMessage").textContent = on
+      ? `Daily reminder is set for ${settings.time}. Tasks with a time also remind you when they are due.`
+      : "Reminders are off.";
   }
 }
 
@@ -148,7 +215,7 @@ async function toggleReminders() {
   }
   saveSettings(settings);
   renderUI();
-  checkReminder();
+  tick();
 }
 
 async function sendTest() {
@@ -201,11 +268,11 @@ export function initNotifications() {
   renderUI();
 
   if (!supported) return;
-  checkReminder();
-  setInterval(checkReminder, 60_000);
+  tick();
+  setInterval(tick, 60_000);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
-      checkReminder();
+      tick();
       renderUI();
     }
   });

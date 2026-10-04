@@ -29,6 +29,12 @@ function init() {
   initSync();
   initBackup();
   initNotifications();
+
+  // Keep the greeting and date correct if the app stays open across a time-of-day change
+  setInterval(renderHeader, 60_000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") renderHeader();
+  });
 }
 
 init();
