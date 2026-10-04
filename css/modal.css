@@ -1,0 +1,145 @@
+/* Task extras */
+.task-desc {
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.task-title {
+  overflow-wrap: anywhere;
+}
+
+.task-actions {
+  display: flex;
+  gap: 2px;
+  transition: opacity var(--transition);
+}
+
+.task-actions .icon-btn {
+  width: 32px;
+  height: 32px;
+}
+
+.task-actions .icon-btn[data-action="delete"]:hover {
+  color: var(--coral);
+}
+
+@media (hover: hover) {
+  .task-actions {
+    opacity: 0;
+  }
+  .task:hover .task-actions,
+  .task:focus-within .task-actions {
+    opacity: 1;
+  }
+}
+
+.is-overdue {
+  color: var(--coral);
+  font-weight: 500;
+}
+
+.task-group + .task-group {
+  border-top: 1px solid var(--border);
+}
+
+.group-title {
+  padding: 12px 18px 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Modal */
+.modal {
+  width: min(480px, calc(100% - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 20px 40px rgba(16, 24, 40, 0.18);
+}
+
+.modal::backdrop {
+  background: rgba(15, 19, 28, 0.5);
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  transition: border-color var(--transition);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+textarea.input {
+  resize: vertical;
+  min-height: 72px;
+}
+
+[data-theme="dark"] .input {
+  color-scheme: dark;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.field-error {
+  font-size: 0.8rem;
+  color: var(--coral);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.btn-ghost:hover {
+  background: var(--surface-2);
+}
+
+@media (max-width: 420px) {
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+}

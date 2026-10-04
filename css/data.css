@@ -1,0 +1,57 @@
+/* Danger buttons */
+.btn-danger {
+  background: var(--coral);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: #e0554c;
+}
+
+.btn-outline-danger {
+  background: transparent;
+  border: 1px solid var(--coral);
+  color: var(--coral);
+}
+
+.btn-outline-danger:hover {
+  background: rgba(244, 103, 94, 0.1);
+}
+
+.danger-card {
+  border-color: rgba(244, 103, 94, 0.35);
+}
+
+#dataMessage.is-error {
+  color: var(--coral);
+}
+
+/* Accessibility */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+}
+
+.skip-link:focus {
+  left: 8px;
+  z-index: 100;
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.main:focus {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

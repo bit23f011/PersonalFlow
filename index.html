@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PersonalFlow</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%234858A3'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='white'%3EP%3C/text%3E%3C/svg%3E" />
+
+  <!-- Apply saved theme before paint to avoid a flash -->
+  <script>
+    (function () {
+      var pref = localStorage.getItem("personalflow-theme") || "system";
+      var dark = pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/modal.css" />
+  <link rel="stylesheet" href="css/views.css" />
+  <link rel="stylesheet" href="css/sync.css" />
+  <link rel="stylesheet" href="css/data.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <noscript><p style="padding:16px">PersonalFlow needs JavaScript to run.</p></noscript>
+
+  <div class="app">
+
+    <!-- Desktop sidebar -->
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">P</span>
+        <span class="brand-name">PersonalFlow</span>
+      </div>
+
+      <nav class="nav-group" aria-label="Workspace">
+        <p class="nav-label">Workspace</p>
+        <button class="nav-item is-active" data-view="overview">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          Overview
+        </button>
+        <button class="nav-item" data-view="tasks">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/></svg>
+          My Tasks
+        </button>
+        <button class="nav-item" data-view="today">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          Today
+        </button>
+        <button class="nav-item" data-view="upcoming">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          Upcoming
+        </button>
+        <button class="nav-item" data-view="completed">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>
+          Completed
+        </button>
+      </nav>
+
+      <nav class="nav-group" aria-label="Categories">
+        <p class="nav-label">Categories</p>
+        <button class="nav-item" data-category="Personal"><span class="dot dot-personal"></span>Personal</button>
+        <button class="nav-item" data-category="Projects"><span class="dot dot-projects"></span>Projects</button>
+        <button class="nav-item" data-category="Learning"><span class="dot dot-learning"></span>Learning</button>
+        <button class="nav-item" data-category="Work"><span class="dot dot-work"></span>Work</button>
+        <button class="nav-item" data-category="Other"><span class="dot dot-other"></span>Other</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="nav-item" data-view="settings">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+          Settings
+        </button>
+        <div class="sync-status" id="syncStatus" data-state="local">
+          <span class="sync-dot" aria-hidden="true"></span><span id="syncStatusLabel">Local only</span>
+        </div>
+        <button class="nav-item js-theme-toggle" type="button" aria-label="Change theme">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+          <span class="js-theme-label">Theme: System</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Mobile top bar -->
+    <header class="mobile-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">P</span>
+        <span class="brand-name">PersonalFlow</span>
+      </div>
+      <div class="mobile-header-actions">
+        <button class="icon-btn" type="button" data-view="settings" aria-label="Settings">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+        </button>
+        <button class="icon-btn js-theme-toggle" type="button" aria-label="Change theme">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="main" id="main" tabindex="-1">
+      <div class="content">
+
+        <header class="topbar">
+          <div class="topbar-text">
+            <h1 id="greeting">Good morning, let's make today productive.</h1>
+            <p class="muted" id="currentDate"></p>
+          </div>
+          <div class="topbar-actions">
+            <label class="search">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input type="search" id="searchInput" placeholder="Search tasks..." aria-label="Search tasks" />
+            </label>
+            <button class="btn btn-primary" id="addTaskBtn" type="button">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Add Task
+            </button>
+          </div>
+        </header>
+
+        <!-- VIEW: Overview -->
+        <div class="view" id="viewOverview">
+          <section class="stats" aria-label="Statistics">
+            <article class="card stat"><p class="stat-label">Total Tasks</p><p class="stat-value" id="statTotal">0</p></article>
+            <article class="card stat"><p class="stat-label">Completed</p><p class="stat-value" id="statCompleted">0</p></article>
+            <article class="card stat"><p class="stat-label">Pending</p><p class="stat-value" id="statPending">0</p></article>
+            <article class="card stat"><p class="stat-label">Today's Focus</p><p class="stat-value" id="statToday">0</p></article>
+          </section>
+
+          <section class="section">
+            <div class="section-head"><h2>Today's Tasks</h2></div>
+            <div class="card">
+              <ul class="task-list" id="todayList"></ul>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head"><h2>Upcoming</h2></div>
+            <div class="card" id="upcomingList"></div>
+          </section>
+        </div>
+
+        <!-- VIEW: Task list (My Tasks / Today / Upcoming / Completed / category / search) -->
+        <div class="view" id="viewList" hidden>
+          <section class="section">
+            <div class="section-head">
+              <h2 id="listTitle">My Tasks</h2>
+              <span class="muted" id="listCount"></span>
+            </div>
+
+            <div class="filter-bar" id="filterBar">
+              <div class="chips" role="group" aria-label="Filter tasks">
+                <button class="chip" type="button" data-filter="tasks">All</button>
+                <button class="chip" type="button" data-filter="today">Today</button>
+                <button class="chip" type="button" data-filter="upcoming">Upcoming</button>
+                <button class="chip" type="button" data-filter="completed">Completed</button>
+                <button class="chip" type="button" id="chipHigh" data-toggle="high" aria-pressed="false">High priority</button>
+              </div>
+              <select class="input select-category" id="categoryFilter" aria-label="Filter by category"></select>
+            </div>
+
+            <div class="card">
+              <ul class="task-list" id="taskList"></ul>
+            </div>
+          </section>
+        </div>
+
+        <!-- VIEW: Settings -->
+        <div class="view" id="viewSettings" hidden>
+
+          <section class="section">
+            <div class="section-head"><h2>Settings</h2></div>
+            <div class="card settings-card">
+
+              <div class="setting-row">
+                <div>
+                  <p class="setting-title">Appearance</p>
+                  <p class="muted">Choose how PersonalFlow looks.</p>
+                </div>
+                <div class="segmented" role="group" aria-label="Theme">
+                  <button type="button" data-theme-choice="light">Light</button>
+                  <button type="button" data-theme-choice="dark">Dark</button>
+                  <button type="button" data-theme-choice="system">System</button>
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div>
+                  <p class="setting-title">Cloud Sync</p>
+                  <p class="muted" id="cloudStatusText" aria-live="polite">Not connected.</p>
+                  <p class="muted" id="cloudLastSynced"></p>
+                </div>
+                <div class="setting-actions">
+                  <button class="btn btn-primary" id="connectBtn" type="button">Connect Google Drive</button>
+                  <button class="btn btn-ghost" id="syncNowBtn" type="button" hidden>Sync Now</button>
+                  <button class="btn btn-ghost" id="disconnectBtn" type="button" hidden>Disconnect</button>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head"><h2>Data</h2></div>
+            <div class="card settings-card">
+
+              <div class="setting-row">
+                <div>
+                  <p class="setting-title">Backup</p>
+                  <p class="muted">Export your tasks, or restore them from a JSON backup.</p>
+                  <p class="muted" id="dataMessage" aria-live="polite"></p>
+                </div>
+                <div class="setting-actions">
+                  <button class="btn btn-ghost" id="exportJsonBtn" type="button">Export JSON</button>
+                  <button class="btn btn-ghost" id="exportCsvBtn" type="button">Export CSV</button>
+                  <button class="btn btn-ghost" id="importJsonBtn" type="button">Import JSON</button>
+                  <input type="file" id="importFile" accept="application/json,.json" hidden />
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div>
+                  <p class="setting-title">Recovery copies</p>
+                  <p class="muted">Versions replaced by a sync decision, import or clear are kept on this device. Restore one with Import JSON.</p>
+                </div>
+                <div class="setting-actions">
+                  <button class="btn btn-ghost" id="exportRecoveryBtn" type="button">Download latest</button>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head"><h2>Danger Zone</h2></div>
+            <div class="card settings-card danger-card">
+              <div class="setting-row">
+                <div>
+                  <p class="setting-title">Clear local data</p>
+                  <p class="muted">Removes all tasks from this device and disconnects Google Drive here. Your Google Drive file is not deleted.</p>
+                </div>
+                <div class="setting-actions">
+                  <button class="btn btn-outline-danger" id="clearDataBtn" type="button">Clear local data</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Mobile bottom nav -->
+    <nav class="bottom-nav" aria-label="Primary">
+      <button class="bn-item is-active" data-view="overview">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span>Overview</span>
+      </button>
+      <button class="bn-item" data-view="tasks">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/></svg>
+        <span>Tasks</span>
+      </button>
+      <button class="bn-item" data-view="today">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>Today</span>
+      </button>
+      <button class="bn-item" data-view="upcoming">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        <span>Upcoming</span>
+      </button>
+    </nav>
+
+    <!-- Mobile floating add button -->
+    <button class="fab" id="addTaskFab" type="button" aria-label="Add task">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+
+  </div>
+
+  <!-- Add / Edit task dialog -->
+  <dialog class="modal" id="taskDialog" aria-labelledby="dialogTitle">
+    <form class="modal-form" id="taskForm" novalidate>
+      <h2 id="dialogTitle">New Task</h2>
+
+      <div class="field">
+        <label for="fieldTitle">Task title</label>
+        <input class="input" id="fieldTitle" type="text" maxlength="200" placeholder="What needs to be done?" autocomplete="off" />
+        <p class="field-error" id="titleError" hidden>Title is required.</p>
+      </div>
+
+      <div class="field">
+        <label for="fieldDescription">Description</label>
+        <textarea class="input" id="fieldDescription" rows="3" placeholder="Optional details"></textarea>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="fieldPriority">Priority</label>
+          <select class="input" id="fieldPriority">
+            <option value="high">High</option>
+            <option value="medium" selected>Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fieldCategory">Category</label>
+          <select class="input" id="fieldCategory"></select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fieldDueDate">Due date</label>
+        <input class="input" id="fieldDueDate" type="date" />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancelTaskBtn" type="button">Cancel</button>
+        <button class="btn btn-primary" id="saveTaskBtn" type="submit">Create Task</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Sync decision dialog -->
+  <dialog class="modal" id="syncDialog" aria-labelledby="syncDialogTitle">
+    <div class="modal-form">
+      <h2 id="syncDialogTitle">Sync</h2>
+      <p class="muted" id="syncDialogText"></p>
+      <div class="modal-actions modal-actions-stack" id="syncDialogActions"></div>
+    </div>
+  </dialog>
+
+  <!-- Generic confirm dialog -->
+  <dialog class="modal" id="confirmDialog" aria-labelledby="confirmTitle">
+    <div class="modal-form">
+      <h2 id="confirmTitle">Are you sure?</h2>
+      <p class="muted" id="confirmText"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="confirmCancelBtn" type="button">Cancel</button>
+        <button class="btn btn-primary" id="confirmOkBtn" type="button">Confirm</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

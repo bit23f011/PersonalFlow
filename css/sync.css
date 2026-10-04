@@ -1,0 +1,41 @@
+/* Sync status dot (sidebar) */
+.sync-status[data-state="synced"] .sync-dot {
+  background: #3a9d6e;
+}
+
+.sync-status[data-state="syncing"] .sync-dot,
+.sync-status[data-state="pending"] .sync-dot {
+  background: var(--amber);
+}
+
+.sync-status[data-state="error"] .sync-dot {
+  background: var(--coral);
+}
+
+/* local / offline keep the default muted dot */
+
+/* Settings: cloud row */
+.setting-row + .setting-row {
+  border-top: 1px solid var(--border);
+}
+
+.setting-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Sync dialog */
+.modal-actions-stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.modal-actions-stack .btn {
+  justify-content: center;
+}
