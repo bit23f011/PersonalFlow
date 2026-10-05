@@ -3,10 +3,12 @@ const RECOVERY_KEY = "personalflow-recovery";
 const DATA_VERSION = 1;
 const MAX_RECOVERY_COPIES = 3;
 const MAX_CATEGORY_LENGTH = 30;
+const MAX_SUBTASK_LENGTH = 200;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // Keep in sync with js/tasks.js
 const PRIORITIES = ["high", "medium", "low"];
+const REPEATS = ["daily", "weekdays", "weekly", "monthly"];
 
 function emptyData() {
   return {
@@ -53,11 +55,30 @@ function cleanCategory(value) {
   return clean || "Other";
 }
 
+// Returns a clean subtask list, or null if the list is malformed
+function cleanSubtasks(value) {
+  if (value === undefined || value === null) return []; // older data without subtasks
+  if (!Array.isArray(value)) return null;
+
+  const result = [];
+  for (const s of value) {
+    if (!s || typeof s !== "object") return null;
+    if (typeof s.id !== "string" || !s.id) return null;
+    if (typeof s.title !== "string" || !s.title.trim()) return null;
+    result.push({
+      id: s.id,
+      title: s.title.trim().slice(0, MAX_SUBTASK_LENGTH),
+      done: s.done === true,
+    });
+  }
+  return result;
+}
+
 /**
  * Validates data coming from outside (Google Drive, JSON import).
  * Returns a clean data object, or null if anything is malformed.
  * Rejects the WHOLE document rather than silently dropping tasks.
- * Older data without dueTime is fine: it simply gets an empty time.
+ * Older data without dueTime, subtasks or repeat is fine.
  */
 export function validateData(raw) {
   if (!raw || typeof raw !== "object" || !Array.isArray(raw.tasks)) return null;
@@ -72,6 +93,9 @@ export function validateData(raw) {
     if (typeof t.id !== "string" || !t.id) return null;
     if (typeof t.title !== "string" || !t.title.trim()) return null;
 
+    const subtasks = cleanSubtasks(t.subtasks);
+    if (!subtasks) return null;
+
     const createdAt = str(t.createdAt, now);
     const dueDate = typeof t.dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.dueDate) ? t.dueDate : "";
 
@@ -83,7 +107,11 @@ export function validateData(raw) {
       category: cleanCategory(t.category), // custom categories are allowed
       dueDate,
       dueTime: dueDate && typeof t.dueTime === "string" && TIME_RE.test(t.dueTime) ? t.dueTime : "",
-      completed: t.completed === true,
+      repeat: dueDate && REPEATS.includes(t.repeat) ? t.repeat : "", // repeating needs a date
+      completedCount: Number.isInteger(t.completedCount) && t.completedCount > 0 ? t.completedCount : 0,
+      subtasks,
+      // With subtasks, "completed" always follows them
+      completed: subtasks.length ? subtasks.every((s) => s.done) : t.completed === true,
       createdAt,
       updatedAt: str(t.updatedAt, createdAt),
     });

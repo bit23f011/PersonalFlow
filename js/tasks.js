@@ -2,7 +2,11 @@ import { getTasks, commitTasks } from "./state.js";
 
 export const PRIORITIES = ["high", "medium", "low"];
 export const BUILTIN_CATEGORIES = ["Personal", "Projects", "Learning", "Work", "Other"];
+export const REPEAT_LABEL = { daily: "Daily", weekdays: "Weekdays", weekly: "Weekly", monthly: "Monthly" };
+const REPEATS = Object.keys(REPEAT_LABEL);
 const MAX_CATEGORY_LENGTH = 30;
+const MAX_SUBTASKS = 100;
+const MAX_SUBTASK_LENGTH = 200;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
@@ -13,6 +17,11 @@ const pad = (n) => String(n).padStart(2, "0");
 
 function toDateStr(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function parseLocal(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
 export function todayStr() {
@@ -44,12 +53,92 @@ export function resolveCategory(name) {
   return existing || clean;
 }
 
+/* ---------- Subtasks ---------- */
+
+// Older tasks have no subtasks field
+export const subtasksOf = (task) => (Array.isArray(task.subtasks) ? task.subtasks : []);
+
+export function getProgress(task) {
+  const subs = subtasksOf(task);
+  const done = subs.filter((s) => s.done).length;
+  return {
+    done,
+    total: subs.length,
+    percent: subs.length ? Math.round((done / subs.length) * 100) : 0,
+  };
+}
+
+/* ---------- Repeating tasks ---------- */
+
+function addInterval(dateStr, repeat) {
+  const d = parseLocal(dateStr);
+  if (repeat === "daily") {
+    d.setDate(d.getDate() + 1);
+  } else if (repeat === "weekdays") {
+    do {
+      d.setDate(d.getDate() + 1);
+    } while (d.getDay() === 0 || d.getDay() === 6); // skip Saturday and Sunday
+  } else if (repeat === "weekly") {
+    d.setDate(d.getDate() + 7);
+  } else if (repeat === "monthly") {
+    const day = d.getDate();
+    d.setMonth(d.getMonth() + 1);
+    if (d.getDate() !== day) d.setDate(0); // e.g. Jan 31 -> Feb 28
+  }
+  return toDateStr(d);
+}
+
+// The next due date that is still after today
+function nextOccurrence(dueDate, repeat) {
+  const today = todayStr();
+  let next = addInterval(dueDate, repeat);
+  for (let i = 0; i < 1000 && next <= today; i++) next = addInterval(next, repeat);
+  return next;
+}
+
+// A finished repeating task goes back to "to do" on its next date, with fresh subtasks
+function reschedule(task) {
+  return {
+    ...task,
+    dueDate: nextOccurrence(task.dueDate, task.repeat),
+    subtasks: subtasksOf(task).map((s) => ({ ...s, done: false })),
+    completed: false,
+    completedCount: (task.completedCount || 0) + 1,
+  };
+}
+
+function settle(task) {
+  return task.repeat && task.dueDate && task.completed ? reschedule(task) : task;
+}
+
 /* ---------- CRUD ---------- */
 
-function newId() {
-  return crypto.randomUUID
-    ? `task-${crypto.randomUUID()}`
-    : `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+function randomId(prefix) {
+  const unique = crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}-${unique}`;
+}
+
+// Rows from the task form: [{ id, title }]. Known ids keep their ticked state
+// (so renaming a subtask keeps its tick), new rows get a new id and start unticked.
+function buildSubtasks(rows, existing) {
+  const doneById = new Map(existing.map((s) => [s.id, s.done]));
+  const used = new Set();
+
+  return (Array.isArray(rows) ? rows : [])
+    .map((r) => ({
+      id: r && r.id,
+      title: String((r && r.title) || "").trim().slice(0, MAX_SUBTASK_LENGTH),
+    }))
+    .filter((r) => r.title)
+    .slice(0, MAX_SUBTASKS)
+    .map((r) => {
+      const known = Boolean(r.id) && doneById.has(r.id) && !used.has(r.id);
+      const id = known ? r.id : randomId("sub");
+      used.add(id);
+      return { id, title: r.title, done: known ? doneById.get(id) : false };
+    });
 }
 
 function normalize(fields) {
@@ -60,8 +149,9 @@ function normalize(fields) {
     priority: PRIORITIES.includes(fields.priority) ? fields.priority : "medium",
     category: resolveCategory(fields.category),
     dueDate,
-    // A time only makes sense together with a date
+    // A time and a repeat only make sense together with a date
     dueTime: dueDate && TIME_RE.test(fields.dueTime || "") ? fields.dueTime : "",
+    repeat: dueDate && REPEATS.includes(fields.repeat) ? fields.repeat : "",
   };
 }
 
@@ -72,9 +162,11 @@ export function getTask(id) {
 export function addTask(fields) {
   const now = new Date().toISOString();
   const task = {
-    id: newId(),
+    id: randomId("task"),
     ...normalize(fields),
+    subtasks: buildSubtasks(fields.subtasks, []),
     completed: false,
+    completedCount: 0,
     createdAt: now,
     updatedAt: now,
   };
@@ -84,19 +176,83 @@ export function addTask(fields) {
 export function updateTask(id, fields) {
   const now = new Date().toISOString();
   commitTasks(
-    getTasks().map((t) => (t.id === id ? { ...t, ...normalize(fields), updatedAt: now } : t))
+    getTasks().map((t) => {
+      if (t.id !== id) return t;
+
+      const subtasks =
+        fields.subtasks === undefined ? subtasksOf(t) : buildSubtasks(fields.subtasks, subtasksOf(t));
+      // With subtasks, the task is complete exactly when all of them are ticked
+      const completed = subtasks.length ? subtasks.every((s) => s.done) : t.completed;
+
+      return settle({ ...t, ...normalize(fields), subtasks, completed, updatedAt: now });
+    })
   );
 }
 
+// Completing (or reopening) a task ticks (or unticks) all of its subtasks.
+// A repeating task moves to its next date instead of staying completed. Returns the updated task.
 export function toggleTask(id) {
   const now = new Date().toISOString();
+  let result = null;
+
   commitTasks(
-    getTasks().map((t) => (t.id === id ? { ...t, completed: !t.completed, updatedAt: now } : t))
+    getTasks().map((t) => {
+      if (t.id !== id) return t;
+      const completed = !t.completed;
+      const subtasks = subtasksOf(t).map((s) => ({ ...s, done: completed }));
+      result = settle({ ...t, completed, subtasks, updatedAt: now });
+      return result;
+    })
+  );
+  return result;
+}
+
+export function toggleSubtask(taskId, subtaskId) {
+  const now = new Date().toISOString();
+  commitTasks(
+    getTasks().map((t) => {
+      if (t.id !== taskId) return t;
+      const subtasks = subtasksOf(t).map((s) => (s.id === subtaskId ? { ...s, done: !s.done } : s));
+      const completed = subtasks.length > 0 && subtasks.every((s) => s.done);
+      return settle({ ...t, subtasks, completed, updatedAt: now });
+    })
   );
 }
 
 export function deleteTask(id) {
   commitTasks(getTasks().filter((t) => t.id !== id));
+}
+
+// Copy of a task: same details, subtasks unticked, " (copy)" added to the title. Returns the new id.
+export function duplicateTask(id) {
+  const source = getTask(id);
+  if (!source) return null;
+
+  const now = new Date().toISOString();
+  const copy = {
+    ...source,
+    id: randomId("task"),
+    title: `${source.title} (copy)`.slice(0, 200),
+    subtasks: subtasksOf(source).map((s) => ({ id: randomId("sub"), title: s.title, done: false })),
+    completed: false,
+    completedCount: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  commitTasks([...getTasks(), copy]);
+  return copy.id;
+}
+
+// Undo: puts a task back exactly as it was (re-inserts it if it was deleted)
+export function restoreTask(snapshot, index) {
+  const tasks = getTasks();
+  if (tasks.some((t) => t.id === snapshot.id)) {
+    commitTasks(tasks.map((t) => (t.id === snapshot.id ? snapshot : t)));
+  } else {
+    const copy = [...tasks];
+    copy.splice(Math.min(index, copy.length), 0, snapshot);
+    commitTasks(copy);
+  }
 }
 
 /* ---------- Queries ---------- */

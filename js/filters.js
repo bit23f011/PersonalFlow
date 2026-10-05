@@ -22,6 +22,12 @@ const SORTERS = {
   completed: (a, b) => b.updatedAt.localeCompare(a.updatedAt),
 };
 
+// Everything searchable in one lowercase string
+function searchText(task) {
+  const subtasks = (Array.isArray(task.subtasks) ? task.subtasks : []).map((s) => s.title).join(" ");
+  return `${task.title} ${task.description} ${task.category} ${subtasks}`.toLowerCase();
+}
+
 export function filterTasks(tasks, { view = "tasks", category = null, highOnly = false, query = "" } = {}) {
   const today = todayStr();
   const q = query.trim().toLowerCase();
@@ -33,7 +39,7 @@ export function filterTasks(tasks, { view = "tasks", category = null, highOnly =
         rule(t, today) &&
         (!category || t.category === category) &&
         (!highOnly || t.priority === "high") &&
-        (!q || `${t.title} ${t.description} ${t.category}`.toLowerCase().includes(q))
+        (!q || searchText(t).includes(q))
     )
     .sort(SORTERS[view] || SORTERS.tasks);
 }

@@ -9,7 +9,8 @@ const SYNC_KEY = "personalflow-sync";
 const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 const CSV_COLUMNS = [
   "id", "title", "description", "priority", "category",
-  "dueDate", "dueTime", "completed", "createdAt", "updatedAt",
+  "dueDate", "dueTime", "completed", "progress", "subtasks",
+  "createdAt", "updatedAt",
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -61,11 +62,26 @@ function csvCell(value) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
+// Plain task fields, plus two computed columns for subtasks
+function csvValue(task, column) {
+  const subs = Array.isArray(task.subtasks) ? task.subtasks : [];
+
+  if (column === "progress") {
+    if (!subs.length) return "";
+    const done = subs.filter((s) => s.done).length;
+    return `${Math.round((done / subs.length) * 100)}%`;
+  }
+  if (column === "subtasks") {
+    return subs.map((s) => `${s.done ? "[x]" : "[ ]"} ${s.title}`).join("\n");
+  }
+  return task[column];
+}
+
 function exportCsv() {
   const tasks = getData().tasks;
   const rows = [
     CSV_COLUMNS.join(","),
-    ...tasks.map((t) => CSV_COLUMNS.map((col) => csvCell(t[col])).join(",")),
+    ...tasks.map((t) => CSV_COLUMNS.map((col) => csvCell(csvValue(t, col))).join(",")),
   ];
   // BOM so Excel reads UTF-8 correctly
   download(`personalflow-tasks-${dateStamp()}.csv`, `\uFEFF${rows.join("\r\n")}`, "text/csv;charset=utf-8");
