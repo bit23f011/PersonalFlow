@@ -31,6 +31,55 @@
   width: auto;
 }
 
+/* Quick add */
+.quickadd {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: -8px;
+}
+
+.quickadd-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--text-muted);
+  transition: border-color var(--transition);
+}
+
+.quickadd-box:focus-within {
+  border-color: var(--accent);
+}
+
+.quickadd-box input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.quickadd-box input::placeholder {
+  color: var(--text-muted);
+}
+
+.quickadd-preview {
+  padding-left: 4px;
+  font-size: 0.82rem;
+}
+
+.quickadd-preview:empty {
+  display: none;
+}
+
 /* Task form: one input box per subtask */
 .field-label {
   font-size: 0.82rem;
@@ -59,6 +108,121 @@
   height: 32px;
   padding: 0 12px;
   font-size: 0.82rem;
+}
+
+/* Star */
+.star-btn {
+  width: 32px;
+  height: 32px;
+  color: var(--text-muted);
+}
+
+.star-btn.is-starred {
+  color: var(--amber);
+}
+
+.star-btn.is-starred .icon {
+  fill: currentColor;
+}
+
+@media (hover: hover) {
+  .star-btn:not(.is-starred) {
+    opacity: 0;
+  }
+  .task:hover .star-btn,
+  .task:focus-within .star-btn {
+    opacity: 1;
+  }
+}
+
+/* Select mode and bulk bar */
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.head-actions .btn-sm {
+  align-self: auto;
+}
+
+.is-selecting .task {
+  cursor: pointer;
+}
+
+.is-selecting .task::before {
+  content: "";
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 6px;
+}
+
+.is-selecting .task.is-selected {
+  background: var(--accent-soft);
+}
+
+.is-selecting .task.is-selected::before {
+  border-color: var(--accent);
+  background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E") center / 14px no-repeat;
+}
+
+.is-selecting .task > .check,
+.is-selecting .task > .star-btn,
+.is-selecting .task > .task-actions {
+  display: none;
+}
+
+.bulkbar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 850;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.18);
+}
+
+.bulkbar[hidden] {
+  display: none;
+}
+
+.bulkbar .btn-sm {
+  align-self: auto;
+}
+
+.bulkbar-count {
+  padding: 0 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.bulk-select {
+  width: auto;
+  height: 32px;
+  padding: 0 8px;
+  font-size: 0.82rem;
+}
+
+.bulkbar .btn:disabled,
+.bulk-select:disabled {
+  opacity: 0.5;
+}
+
+body.has-bulkbar .toast {
+  bottom: 96px;
 }
 
 /* Toast (Undo) */
@@ -112,6 +276,19 @@
   /* above the "+" button and the bottom navigation */
   .toast {
     bottom: calc(var(--bottom-nav-h) + 84px + env(safe-area-inset-bottom));
+  }
+
+  .bulkbar {
+    bottom: calc(var(--bottom-nav-h) + 12px + env(safe-area-inset-bottom));
+    width: calc(100% - 24px);
+  }
+
+  body.has-bulkbar .toast {
+    bottom: calc(var(--bottom-nav-h) + 150px + env(safe-area-inset-bottom));
+  }
+
+  body.has-bulkbar .fab {
+    display: none;
   }
 }
 

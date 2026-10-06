@@ -78,7 +78,7 @@ function cleanSubtasks(value) {
  * Validates data coming from outside (Google Drive, JSON import).
  * Returns a clean data object, or null if anything is malformed.
  * Rejects the WHOLE document rather than silently dropping tasks.
- * Older data without dueTime, subtasks or repeat is fine.
+ * Older data without dueTime, subtasks, repeat or starred is fine.
  */
 export function validateData(raw) {
   if (!raw || typeof raw !== "object" || !Array.isArray(raw.tasks)) return null;
@@ -109,6 +109,7 @@ export function validateData(raw) {
       dueTime: dueDate && typeof t.dueTime === "string" && TIME_RE.test(t.dueTime) ? t.dueTime : "",
       repeat: dueDate && REPEATS.includes(t.repeat) ? t.repeat : "", // repeating needs a date
       completedCount: Number.isInteger(t.completedCount) && t.completedCount > 0 ? t.completedCount : 0,
+      starred: t.starred === true,
       subtasks,
       // With subtasks, "completed" always follows them
       completed: subtasks.length ? subtasks.every((s) => s.done) : t.completed === true,

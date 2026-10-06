@@ -2,6 +2,7 @@ import { todayStr } from "./tasks.js";
 
 const RANK = { high: 0, medium: 1, low: 2 };
 const byDone = (a, b) => Number(a.completed) - Number(b.completed);
+const byStar = (a, b) => Number(Boolean(b.starred)) - Number(Boolean(a.starred));
 const byPriority = (a, b) => RANK[a.priority] - RANK[b.priority];
 const byDate = (a, b) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999");
 const byTime = (a, b) => (a.dueTime || "99:99").localeCompare(b.dueTime || "99:99");
@@ -14,11 +15,11 @@ const VIEW_RULES = {
   completed: (t) => t.completed,
 };
 
-// How each view is ordered
+// How each view is ordered (starred tasks come first)
 const SORTERS = {
-  tasks: (a, b) => byDone(a, b) || byPriority(a, b) || byDate(a, b) || byTime(a, b),
-  today: (a, b) => byDone(a, b) || byDate(a, b) || byTime(a, b) || byPriority(a, b),
-  upcoming: (a, b) => byDate(a, b) || byTime(a, b) || byPriority(a, b),
+  tasks: (a, b) => byDone(a, b) || byStar(a, b) || byPriority(a, b) || byDate(a, b) || byTime(a, b),
+  today: (a, b) => byDone(a, b) || byStar(a, b) || byDate(a, b) || byTime(a, b) || byPriority(a, b),
+  upcoming: (a, b) => byStar(a, b) || byDate(a, b) || byTime(a, b) || byPriority(a, b),
   completed: (a, b) => b.updatedAt.localeCompare(a.updatedAt),
 };
 
@@ -28,7 +29,10 @@ function searchText(task) {
   return `${task.title} ${task.description} ${task.category} ${subtasks}`.toLowerCase();
 }
 
-export function filterTasks(tasks, { view = "tasks", category = null, highOnly = false, query = "" } = {}) {
+export function filterTasks(
+  tasks,
+  { view = "tasks", category = null, highOnly = false, starredOnly = false, query = "" } = {}
+) {
   const today = todayStr();
   const q = query.trim().toLowerCase();
   const rule = VIEW_RULES[view] || VIEW_RULES.tasks;
@@ -39,6 +43,7 @@ export function filterTasks(tasks, { view = "tasks", category = null, highOnly =
         rule(t, today) &&
         (!category || t.category === category) &&
         (!highOnly || t.priority === "high") &&
+        (!starredOnly || t.starred === true) &&
         (!q || searchText(t).includes(q))
     )
     .sort(SORTERS[view] || SORTERS.tasks);

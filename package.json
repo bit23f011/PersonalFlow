@@ -1,0 +1,9 @@
+{
+  "name": "personalflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Personal task manager (static site, no build step)",
+  "scripts": {
+    "dev": "npx serve -l 5500 ."
+  }
+}

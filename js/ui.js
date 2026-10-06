@@ -1,6 +1,6 @@
 import { subscribe, getTasks } from "./state.js";
 import {
-  addTask, updateTask, toggleTask, toggleSubtask, deleteTask, duplicateTask, restoreTask, getTask,
+  addTask, updateTask, toggleTask, toggleSubtask, toggleStar, deleteTask, duplicateTask, restoreTask, getTask,
   getStats, getTodayTasks, getUpcomingGroups, getCategories,
   getProgress, subtasksOf, REPEAT_LABEL, todayStr, tomorrowStr,
 } from "./tasks.js";
@@ -34,6 +34,7 @@ const ICON_EDIT = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><pat
 const ICON_DELETE = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>';
 const ICON_CALENDAR = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M12 13v4M10 15h4"/></svg>';
 const ICON_COPY = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>';
+const ICON_STAR = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9Z"/></svg>';
 const ICON_CHEVRON = '<svg class="icon chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
 const ICON_PLUS = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 const ICON_CLOSE = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
@@ -49,7 +50,7 @@ const EMPTY_TEXT = {
   completed: ["No completed tasks", "Finished tasks will show up here."],
 };
 
-const ui = { view: "overview", category: null, highOnly: false, query: "" };
+const ui = { view: "overview", category: null, highOnly: false, starredOnly: false, query: "" };
 const expanded = new Set(); // ids of tasks whose subtask list is open
 
 /* ---------- Helpers ---------- */
@@ -219,6 +220,7 @@ function progressHtml(task) {
 function taskRow(task) {
   const due = dueInfo(task);
   const title = escapeHtml(task.title);
+  const starred = task.starred === true;
   const desc = task.description ? `<p class="task-desc">${escapeHtml(task.description)}</p>` : "";
   const dueHtml = due.text
     ? `<span class="meta-item${due.overdue ? " is-overdue" : ""}">${due.text}</span>`
@@ -246,6 +248,9 @@ function taskRow(task) {
         </div>
         ${progressHtml(task)}
       </div>
+      <button class="icon-btn star-btn${starred ? " is-starred" : ""}" type="button" data-action="star"
+        aria-pressed="${starred}" title="${starred ? "Unstar" : "Star"}"
+        aria-label="${starred ? "Unstar" : "Star"} task: ${title}">${ICON_STAR}</button>
       <div class="task-actions">
         ${calendarBtn}
         <button class="icon-btn" type="button" data-action="duplicate" title="Duplicate" aria-label="Duplicate task: ${title}">${ICON_COPY}</button>
@@ -321,6 +326,8 @@ function renderList(categories) {
   });
   $("chipHigh").classList.toggle("is-active", ui.highOnly);
   $("chipHigh").setAttribute("aria-pressed", String(ui.highOnly));
+  $("chipStar").classList.toggle("is-active", ui.starredOnly);
+  $("chipStar").setAttribute("aria-pressed", String(ui.starredOnly));
 
   $("categoryFilter").innerHTML =
     `<option value="">All categories</option>${categories.map(categoryOption).join("")}`;
@@ -329,7 +336,7 @@ function renderList(categories) {
   if (tasks.length) {
     $("taskList").innerHTML = tasks.map(taskRow).join("");
   } else {
-    const filtered = query || ui.category || ui.highOnly;
+    const filtered = query || ui.category || ui.highOnly || ui.starredOnly;
     const [t, msg] = filtered
       ? ["No matching tasks", "Try a different search or filter."]
       : EMPTY_TEXT[ui.view];
@@ -371,6 +378,7 @@ function go(view, category = null) {
   ui.view = view;
   ui.category = category;
   ui.highOnly = false;
+  ui.starredOnly = false;
   if (view === "overview" || view === "settings") {
     ui.query = "";
     $("searchInput").value = "";
@@ -633,6 +641,9 @@ async function onListClick(e) {
     else expanded.add(id);
     render();
     refocus(id, '[data-action="subtasks"]');
+  } else if (action === "star") {
+    toggleStar(id);
+    refocus(id, '[data-action="star"]');
   } else if (action === "edit") {
     openDialog(getTask(id));
   } else if (action === "duplicate") {
@@ -667,6 +678,12 @@ export function initUI() {
   setupRepeatField();
   $("fieldDueDate").addEventListener("input", syncDateFields);
 
+  // "Starred" filter chip next to "High priority"
+  $("chipHigh").insertAdjacentHTML(
+    "afterend",
+    '<button class="chip" type="button" id="chipStar" data-toggle="starred" aria-pressed="false">★ Starred</button>'
+  );
+
   // Navigation (sidebar, bottom nav, settings icon)
   document.addEventListener("click", onNavClick);
 
@@ -682,6 +699,7 @@ export function initUI() {
     const chip = e.target.closest(".chip");
     if (!chip) return;
     if (chip.dataset.toggle === "high") ui.highOnly = !ui.highOnly;
+    else if (chip.dataset.toggle === "starred") ui.starredOnly = !ui.starredOnly;
     else ui.view = chip.dataset.filter;
     render();
   });

@@ -165,6 +165,7 @@ export function addTask(fields) {
     id: randomId("task"),
     ...normalize(fields),
     subtasks: buildSubtasks(fields.subtasks, []),
+    starred: false,
     completed: false,
     completedCount: 0,
     createdAt: now,
@@ -219,6 +220,11 @@ export function toggleSubtask(taskId, subtaskId) {
   );
 }
 
+export function toggleStar(id) {
+  const now = new Date().toISOString();
+  commitTasks(getTasks().map((t) => (t.id === id ? { ...t, starred: !t.starred, updatedAt: now } : t)));
+}
+
 export function deleteTask(id) {
   commitTasks(getTasks().filter((t) => t.id !== id));
 }
@@ -234,6 +240,7 @@ export function duplicateTask(id) {
     id: randomId("task"),
     title: `${source.title} (copy)`.slice(0, 200),
     subtasks: subtasksOf(source).map((s) => ({ id: randomId("sub"), title: s.title, done: false })),
+    starred: false,
     completed: false,
     completedCount: 0,
     createdAt: now,
@@ -243,25 +250,63 @@ export function duplicateTask(id) {
   return copy.id;
 }
 
-// Undo: puts a task back exactly as it was (re-inserts it if it was deleted)
+/* ---------- Bulk changes (one save for many tasks) ---------- */
+
+function changeMany(ids, change) {
+  const set = new Set(ids);
+  const now = new Date().toISOString();
+  commitTasks(getTasks().map((t) => (set.has(t.id) ? change(t, now) : t)));
+}
+
+export function completeTasks(ids) {
+  changeMany(ids, (t, now) =>
+    t.completed
+      ? t
+      : settle({ ...t, completed: true, subtasks: subtasksOf(t).map((s) => ({ ...s, done: true })), updatedAt: now })
+  );
+}
+
+export function starTasks(ids, value) {
+  changeMany(ids, (t, now) => ({ ...t, starred: value, updatedAt: now }));
+}
+
+export function moveToCategory(ids, category) {
+  const name = resolveCategory(category);
+  changeMany(ids, (t, now) => ({ ...t, category: name, updatedAt: now }));
+}
+
+export function deleteTasks(ids) {
+  const set = new Set(ids);
+  commitTasks(getTasks().filter((t) => !set.has(t.id)));
+}
+
+/* ---------- Undo ---------- */
+
+// Puts tasks back exactly as they were: [{ task, index }]. Deleted ones are re-inserted.
+export function restoreTasks(snaps) {
+  const tasks = [...getTasks()];
+  [...snaps]
+    .sort((a, b) => a.index - b.index)
+    .forEach(({ task, index }) => {
+      const i = tasks.findIndex((t) => t.id === task.id);
+      if (i >= 0) tasks[i] = task;
+      else tasks.splice(Math.min(index, tasks.length), 0, task);
+    });
+  commitTasks(tasks);
+}
+
 export function restoreTask(snapshot, index) {
-  const tasks = getTasks();
-  if (tasks.some((t) => t.id === snapshot.id)) {
-    commitTasks(tasks.map((t) => (t.id === snapshot.id ? snapshot : t)));
-  } else {
-    const copy = [...tasks];
-    copy.splice(Math.min(index, copy.length), 0, snapshot);
-    commitTasks(copy);
-  }
+  restoreTasks([{ task: snapshot, index }]);
 }
 
 /* ---------- Queries ---------- */
 
-// Not done first, then by date, then by time (untimed last), then by priority
+// Not done first, starred first, then by date, then by time (untimed last), then by priority
 function sortTasks(list) {
   return [...list].sort(
     (a, b) =>
       Number(a.completed) - Number(b.completed) ||
+      Number(Boolean(b.starred)) - Number(Boolean(a.starred)) ||
       (a.dueDate || "9999").localeCompare(b.dueDate || "9999") ||
       (a.dueTime || "99:99").localeCompare(b.dueTime || "99:99") ||
       PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]
