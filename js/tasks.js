@@ -1,4 +1,5 @@
 import { getTasks, commitTasks } from "./state.js";
+import { normalizeHex } from "./colors.js";
 
 export const PRIORITIES = ["high", "medium", "low"];
 export const BUILTIN_CATEGORIES = ["Personal", "Projects", "Learning", "Work", "Other"];
@@ -148,6 +149,7 @@ function normalize(fields) {
     description: (fields.description || "").trim(),
     priority: PRIORITIES.includes(fields.priority) ? fields.priority : "medium",
     category: resolveCategory(fields.category),
+    color: normalizeHex(fields.color),
     dueDate,
     // A time and a repeat only make sense together with a date
     dueTime: dueDate && TIME_RE.test(fields.dueTime || "") ? fields.dueTime : "",
@@ -229,7 +231,8 @@ export function deleteTask(id) {
   commitTasks(getTasks().filter((t) => t.id !== id));
 }
 
-// Copy of a task: same details, subtasks unticked, " (copy)" added to the title. Returns the new id.
+// Copy of a task: same details (and colour), subtasks unticked, " (copy)" added to the title.
+// Returns the new id.
 export function duplicateTask(id) {
   const source = getTask(id);
   if (!source) return null;

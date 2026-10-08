@@ -1,0 +1,148 @@
+/* Alerts bell and panel (loaded by js/alerts.js) */
+
+.alerts {
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  z-index: 800;
+  width: 340px;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.2);
+}
+
+.alerts[hidden] {
+  display: none;
+}
+
+.alerts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.alerts-head h2 {
+  font-size: 1rem;
+}
+
+#alertsBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.alerts-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.alerts-count {
+  padding: 0 7px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  font-size: 0.72rem;
+}
+
+.alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  background: var(--task-tint, var(--surface-2));
+  border-radius: var(--radius-sm);
+  box-shadow: inset 3px 0 0 var(--task-color, transparent);
+}
+
+.alert-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.alert-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.alert-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.alert-meta .is-overdue {
+  color: var(--coral);
+}
+
+.alerts-empty {
+  padding: 12px 0;
+  text-align: center;
+}
+
+/* Number badge on the bell */
+.bell-badge {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--coral);
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.bell-badge[hidden] {
+  display: none;
+}
+
+.nav-item .bell-badge {
+  margin-left: auto;
+}
+
+.alerts-bell {
+  position: relative;
+}
+
+.alerts-bell .bell-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  font-size: 0.65rem;
+}
+
+@media (max-width: 760px) {
+  .alerts {
+    top: 64px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: calc(100vh - 150px);
+  }
+}

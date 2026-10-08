@@ -5,6 +5,7 @@ const MAX_RECOVERY_COPIES = 3;
 const MAX_CATEGORY_LENGTH = 30;
 const MAX_SUBTASK_LENGTH = 200;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 // Keep in sync with js/tasks.js
 const PRIORITIES = ["high", "medium", "low"];
@@ -78,7 +79,7 @@ function cleanSubtasks(value) {
  * Validates data coming from outside (Google Drive, JSON import).
  * Returns a clean data object, or null if anything is malformed.
  * Rejects the WHOLE document rather than silently dropping tasks.
- * Older data without dueTime, subtasks, repeat or starred is fine.
+ * Older data without dueTime, subtasks, repeat, starred or color is fine.
  */
 export function validateData(raw) {
   if (!raw || typeof raw !== "object" || !Array.isArray(raw.tasks)) return null;
@@ -105,6 +106,7 @@ export function validateData(raw) {
       description: typeof t.description === "string" ? t.description : "",
       priority: PRIORITIES.includes(t.priority) ? t.priority : "medium",
       category: cleanCategory(t.category), // custom categories are allowed
+      color: typeof t.color === "string" && COLOR_RE.test(t.color) ? t.color.toLowerCase() : "",
       dueDate,
       dueTime: dueDate && typeof t.dueTime === "string" && TIME_RE.test(t.dueTime) ? t.dueTime : "",
       repeat: dueDate && REPEATS.includes(t.repeat) ? t.repeat : "", // repeating needs a date

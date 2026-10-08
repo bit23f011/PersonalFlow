@@ -53,8 +53,27 @@
     display: none;
   }
 
+  /* Task cards: the text gets the full width, the buttons sit on their own row below it */
   .task {
+    flex-wrap: wrap;
+    gap: 6px 14px;
     padding: 14px;
+  }
+
+  .task-body {
+    flex: 1 1 calc(100% - 34px);
+    min-width: 0;
+  }
+
+  .task > .star-btn {
+    margin-left: 34px;
+    margin-right: -10px;
+  }
+
+  .star-btn,
+  .task-actions .icon-btn {
+    width: 36px;
+    height: 36px;
   }
 
   .bottom-nav {

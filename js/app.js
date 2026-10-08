@@ -4,6 +4,7 @@ import { initUI } from "./ui.js";
 import { initBulk } from "./bulk.js";
 import { initQuickAdd } from "./quickadd.js";
 import { initPomodoro } from "./pomodoro.js";
+import { initAlerts } from "./alerts.js";
 import { initSync } from "./sync.js";
 import { initBackup } from "./backup.js";
 import { initNotifications } from "./notifications.js";
@@ -59,6 +60,7 @@ function init() {
   initBulk(); // after initUI: it re-applies the selection after every list redraw
   initQuickAdd();
   initPomodoro();
+  initAlerts();
   initSync();
   initBackup();
   initNotifications();

@@ -7,6 +7,7 @@ import {
 import { filterTasks } from "./filters.js";
 import { confirmAction } from "./dialogs.js";
 import { showToast } from "./toast.js";
+import { PRESET_COLORS, normalizeHex, colorStyle } from "./colors.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -96,7 +97,8 @@ function isOverdue(task) {
   return false;
 }
 
-function dueInfo(task) {
+// Text like "Today, 3:30 PM" or "Overdue · Oct 3" (also used by the alerts panel)
+export function dueInfo(task) {
   if (!task.dueDate) return { text: "", overdue: false };
 
   let day = formatShort(task.dueDate);
@@ -148,6 +150,14 @@ function openCalendar(task) {
 }
 
 const categoryOption = (c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`;
+
+function loadStyles() {
+  // The card colour feature brings its own stylesheet
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = "css/colors.css";
+  document.head.appendChild(link);
+}
 
 /* ---------- Undo ---------- */
 
@@ -221,6 +231,7 @@ function taskRow(task) {
   const due = dueInfo(task);
   const title = escapeHtml(task.title);
   const starred = task.starred === true;
+  const color = normalizeHex(task.color);
   const desc = task.description ? `<p class="task-desc">${escapeHtml(task.description)}</p>` : "";
   const dueHtml = due.text
     ? `<span class="meta-item${due.overdue ? " is-overdue" : ""}">${due.text}</span>`
@@ -233,7 +244,7 @@ function taskRow(task) {
     : "";
 
   return `
-    <li class="task${task.completed ? " is-done" : ""}" data-id="${escapeHtml(task.id)}">
+    <li class="task${task.completed ? " is-done" : ""}${color ? " has-color" : ""}" data-id="${escapeHtml(task.id)}"${color ? ` style="${colorStyle(color)}"` : ""}>
       <button class="check${task.completed ? " is-checked" : ""}" type="button" role="checkbox"
         aria-checked="${task.completed}" data-action="toggle"
         aria-label="${task.completed ? "Mark as not done" : "Mark as done"}: ${title}"></button>
@@ -399,6 +410,7 @@ function onNavClick(e) {
 const dialog = $("taskDialog");
 const form = $("taskForm");
 let editingId = null;
+let selectedColor = ""; // "" = no colour, otherwise "#rrggbb"
 
 // Adds the "new category name" input under the category dropdown
 function setupNewCategoryField() {
@@ -412,6 +424,75 @@ function setupNewCategoryField() {
     $("fieldNewCategory").hidden = !isNew;
     if (!isNew) $("categoryError").hidden = true;
     else $("fieldNewCategory").focus();
+  });
+}
+
+/* ----- Card colour (swatches, full colour picker, hex code) ----- */
+
+// Sets the colour everywhere in the form: swatches, picker, hex box and the dialog's own top stripe
+function applyColor(color, { updateHex = true } = {}) {
+  selectedColor = color;
+
+  document.querySelectorAll("#colorSwatches .swatch").forEach((swatch) => {
+    const on = swatch.dataset.color === color;
+    swatch.classList.toggle("is-active", on);
+    swatch.setAttribute("aria-pressed", String(on));
+  });
+  if (color) $("fieldColorPicker").value = color;
+  if (updateHex) $("fieldColorHex").value = color;
+  $("colorError").hidden = true;
+
+  dialog.classList.toggle("has-color", Boolean(color));
+  if (color) dialog.style.setProperty("--dialog-color", color);
+  else dialog.style.removeProperty("--dialog-color");
+}
+
+// Adds the "Card color" section under the priority and category fields
+function setupColorField() {
+  const swatches = PRESET_COLORS.map(
+    (c) =>
+      `<button class="swatch" type="button" data-color="${c}" style="background:${c}" aria-pressed="false" aria-label="Color ${c}"></button>`
+  ).join("");
+
+  $("fieldPriority")
+    .closest(".field-row")
+    .insertAdjacentHTML(
+      "afterend",
+      '<div class="field" role="group" aria-labelledby="colorLabel">' +
+        '<span class="field-label" id="colorLabel">Card color</span>' +
+        '<div class="color-swatches" id="colorSwatches">' +
+        `<button class="swatch swatch-none" type="button" data-color="" aria-pressed="true" aria-label="No color" title="No color">${ICON_CLOSE}</button>` +
+        swatches +
+        "</div>" +
+        '<div class="color-custom">' +
+        '<input class="color-picker" id="fieldColorPicker" type="color" value="#4858a3" aria-label="Pick any color" />' +
+        '<input class="input" id="fieldColorHex" type="text" maxlength="7" placeholder="#RRGGBB" autocomplete="off" spellcheck="false" aria-label="Hex color code" />' +
+        "</div>" +
+        '<p class="field-error" id="colorError" hidden>Use a hex code like #4858A3.</p>' +
+        "</div>"
+    );
+
+  $("colorSwatches").addEventListener("click", (e) => {
+    const swatch = e.target.closest(".swatch");
+    if (swatch) applyColor(swatch.dataset.color);
+  });
+
+  $("fieldColorPicker").addEventListener("input", (e) => applyColor(normalizeHex(e.target.value)));
+
+  // Typing a hex code: the colour updates as soon as the code is valid
+  $("fieldColorHex").addEventListener("input", (e) => {
+    const text = e.target.value.trim();
+    const hex = normalizeHex(text);
+    if (hex) applyColor(hex, { updateHex: false });
+    else if (!text) applyColor("", { updateHex: false });
+  });
+
+  $("fieldColorHex").addEventListener("blur", (e) => {
+    const text = e.target.value.trim();
+    if (!text) return;
+    const hex = normalizeHex(text);
+    if (hex) e.target.value = hex;
+    else $("colorError").hidden = false;
   });
 }
 
@@ -559,6 +640,7 @@ function openDialog(task = null) {
   setSubtaskRows(task ? subtasksOf(task) : []);
   $("fieldPriority").value = task ? task.priority : "medium";
   $("fieldCategory").value = task ? task.category : defaultCategory;
+  applyColor(task ? normalizeHex(task.color) : "");
   $("fieldDueDate").value = task ? task.dueDate : "";
   $("fieldDueTime").value = task ? task.dueTime || "" : "";
   $("fieldRepeat").value = task ? task.repeat || "" : "";
@@ -587,12 +669,21 @@ function onSubmit(e) {
     }
   }
 
+  // A hex code that was typed but is not valid must not be silently ignored
+  const hexText = $("fieldColorHex").value.trim();
+  if (hexText && !normalizeHex(hexText)) {
+    $("colorError").hidden = false;
+    $("fieldColorHex").focus();
+    return;
+  }
+
   const fields = {
     title,
     description: $("fieldDescription").value,
     subtasks: readSubtaskRows(), // empty boxes are ignored
     priority: $("fieldPriority").value,
     category,
+    color: selectedColor,
     dueDate: $("fieldDueDate").value,
     dueTime: $("fieldDueTime").value,
     repeat: $("fieldRepeat").value,
@@ -601,6 +692,12 @@ function onSubmit(e) {
   if (editingId) updateTask(editingId, fields);
   else addTask(fields);
   dialog.close();
+}
+
+// Opens the edit dialog for a task (used by the alerts panel)
+export function editTask(id) {
+  const task = getTask(id);
+  if (task) openDialog(task);
 }
 
 /* ---------- Task row actions ---------- */
@@ -673,7 +770,9 @@ async function onListClick(e) {
 /* ---------- Init ---------- */
 
 export function initUI() {
+  loadStyles();
   setupNewCategoryField();
+  setupColorField();
   setupSubtasksField();
   setupRepeatField();
   $("fieldDueDate").addEventListener("input", syncDateFields);

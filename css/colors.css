@@ -1,0 +1,83 @@
+/* Task card colour (loaded by js/ui.js) */
+
+/* On the card: a coloured stripe, a soft tint, and a coloured checkbox */
+.task.has-color {
+  background: var(--task-tint);
+  box-shadow: inset 4px 0 0 var(--task-color);
+}
+
+.task.has-color:hover {
+  background: var(--task-tint-strong);
+}
+
+.task.has-color .check:not(.is-checked) {
+  border-color: var(--task-color);
+}
+
+.task.has-color .check.is-checked {
+  background-color: var(--task-color);
+  border-color: var(--task-color);
+}
+
+/* Inside: the edit dialog shows the same colour on top */
+.modal.has-color {
+  border-top: 5px solid var(--dialog-color);
+}
+
+/* Colour field in the task form */
+.color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.swatch {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  color: var(--text-muted);
+  transition: transform var(--transition);
+}
+
+.swatch:hover {
+  transform: scale(1.1);
+}
+
+.swatch.is-active {
+  border-color: var(--text);
+}
+
+.swatch-none {
+  background: var(--surface-2);
+}
+
+.swatch .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.color-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-picker {
+  width: 44px;
+  height: 38px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.color-custom .input {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
