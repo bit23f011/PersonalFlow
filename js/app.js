@@ -1,4 +1,5 @@
 import { initTheme } from "./theme.js";
+import { initLock } from "./lock.js";
 import { initUI } from "./ui.js";
 import { initBulk } from "./bulk.js";
 import { initQuickAdd } from "./quickadd.js";
@@ -52,6 +53,7 @@ function hideSplash() {
 
 function init() {
   initTheme();
+  initLock(); // right after the theme, so the lock screen covers the app as early as possible
   renderHeader();
   initUI();
   initBulk(); // after initUI: it re-applies the selection after every list redraw
