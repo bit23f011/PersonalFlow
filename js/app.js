@@ -14,9 +14,9 @@ const SPLASH_MIN_MS = 1000; // the splash stays visible at least this long after
 
 function getGreeting(date = new Date()) {
   const hour = date.getHours();
-  if (hour < 12) return "Good morning, let's make today productive.";
-  if (hour < 18) return "Good afternoon, keep the momentum going.";
-  return "Good evening, let's wrap up the day well.";
+  if (hour < 12) return "Good Morning Mujahid, let's make today productive.";
+  if (hour < 18) return "Good Afternoon Mujahid, keep the momentum going.";
+  return "Good Evening Mujahid, let's wrap up the day well.";
 }
 
 function renderHeader() {

@@ -6,6 +6,11 @@ import { validateData, saveRecoveryCopy } from "./storage.js";
 const META_KEY = "personalflow-sync";
 const $ = (id) => document.getElementById(id);
 
+// CSS ke mobile breakpoint ke barabar rakho (@media max-width: 760px)
+const MOBILE_QUERY = "(max-width: 760px)";
+// Mobile par auto sync band, sirf button dabane par sync hoga
+const isMobile = () => window.matchMedia(MOBILE_QUERY).matches;
+
 // Errors that mean "Google sign-in is needed"
 const AUTH_CODES = new Set([
   "popup_closed", "popup_failed_to_open", "access_denied", "interaction_required",
@@ -341,13 +346,15 @@ async function runSync({ interactive = false } = {}) {
   } finally {
     syncing = false;
     renderUI();
-    // Edits made while syncing still need uploading
+    // Edits made while syncing still need uploading (scheduleSync mobile par kuch nahi karta)
     if (!lastIssue && loadMeta().connected && pendingChanges()) scheduleSync(500);
   }
 }
 
+// Auto sync sirf desktop par. Mobile par yahin se return, to koi bhi trigger sync nahi chalayega.
 function scheduleSync(delay = 2000) {
   clearTimeout(timer);
+  if (isMobile()) return;
   if (!loadMeta().connected || lastIssue) return;
   timer = setTimeout(() => runSync({ interactive: false }), delay);
 }
@@ -356,7 +363,7 @@ function onDataChange() {
   if (suppressChange) return;
   if (lastIssue && lastIssue.kind === "error") lastIssue = null; // retry after a transient failure
   renderUI();
-  scheduleSync();
+  scheduleSync(); // mobile par ye skip ho jayega
 }
 
 function disconnect() {
@@ -369,6 +376,7 @@ function disconnect() {
 }
 
 export function initSync() {
+  // Buttons: har jagah manual sync (mobile aur desktop dono)
   $("connectBtn").addEventListener("click", () => runSync({ interactive: true }));
   $("syncNowBtn").addEventListener("click", () => runSync({ interactive: true }));
   $("disconnectBtn").addEventListener("click", disconnect);
@@ -378,15 +386,24 @@ export function initSync() {
   window.addEventListener("online", () => {
     if (lastIssue && lastIssue.retryOnOnline) lastIssue = null;
     renderUI();
-    scheduleSync(500);
+    scheduleSync(500); // mobile par skip
   });
   window.addEventListener("offline", renderUI);
 
-  // Pick up changes from another device when returning to the tab (only if already signed in)
+  // Tab par wapas aane par sync: sirf desktop (mobile par ye baar-baar fire hota tha)
   document.addEventListener("visibilitychange", () => {
+    if (isMobile()) return;
     if (document.visibilityState === "visible" && hasAccessToken()) scheduleSync(300);
   });
 
+  // Screen size badalne par (rotate/resize) sirf status refresh, sync nahi
+  window.matchMedia(MOBILE_QUERY).addEventListener("change", () => {
+    clearTimeout(timer);
+    renderUI();
+  });
+
   renderUI();
-  if (loadMeta().connected) runSync({ interactive: false });
+
+  // Page load par auto sync: sirf desktop
+  if (loadMeta().connected && !isMobile()) runSync({ interactive: false });
 }
