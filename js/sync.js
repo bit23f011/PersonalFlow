@@ -4,12 +4,13 @@ import { getData, replaceData, subscribe } from "./state.js";
 import { validateData, saveRecoveryCopy } from "./storage.js";
 
 const META_KEY = "personalflow-sync";
+const MODE_KEY = "personalflow-sync-mode"; // "manual" (default) or "auto", per device
+const AUTO_DELAY_MS = 30_000; // automatic mode: wait this long after the last change
+
 const $ = (id) => document.getElementById(id);
 
-// CSS ke mobile breakpoint ke barabar rakho (@media max-width: 760px)
-const MOBILE_QUERY = "(max-width: 760px)";
-// Mobile par auto sync band, sirf button dabane par sync hoga
-const isMobile = () => window.matchMedia(MOBILE_QUERY).matches;
+const SYNC_ICON =
+  '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>';
 
 // Errors that mean "Google sign-in is needed"
 const AUTH_CODES = new Set([
@@ -27,10 +28,33 @@ const STATES = {
   reconnect: { dot: "pending", label: "Sign in to sync", message: "Sign in again to sync. Your changes are saved on this device." },
 };
 
+const PILL_LABEL = { syncing: "Syncing…", reconnect: "Sign in to sync", error: "Retry sync", pending: "Sync" };
+
 let syncing = false;
 let timer = null;
 let lastIssue = null; // { kind: "auth" | "error" | "decision", state, message, retryOnOnline? }
 let suppressChange = false;
+
+/* ---------- Sync mode ---------- */
+
+function autoSyncEnabled() {
+  try {
+    return localStorage.getItem(MODE_KEY) === "auto";
+  } catch {
+    return false;
+  }
+}
+
+function setMode(mode) {
+  try {
+    localStorage.setItem(MODE_KEY, mode === "auto" ? "auto" : "manual");
+  } catch (err) {
+    console.error("Could not save the sync mode", err);
+  }
+  clearTimeout(timer);
+  if (autoSyncEnabled()) scheduleSync(2000); // switching to automatic: sync soon
+  renderUI();
+}
 
 /* ---------- Saved sync info (separate from task data) ---------- */
 
@@ -70,14 +94,25 @@ function currentState() {
   return pendingChanges() ? "pending" : "synced";
 }
 
+function formatWhen(iso) {
+  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
 function renderUI() {
   const meta = loadMeta();
   const connected = Boolean(meta.connected);
-  const state = STATES[currentState()];
+  const key = currentState();
+  const state = STATES[key];
 
-  $("syncStatus").dataset.state = state.dot;
+  // Sidebar status (also works as a sync button)
+  const status = $("syncStatus");
+  status.dataset.state = state.dot;
+  status.classList.toggle("is-clickable", connected);
+  status.setAttribute("aria-disabled", String(!connected));
+  status.title = connected ? "Click to sync now" : "";
   $("syncStatusLabel").textContent = state.label;
 
+  // Settings
   $("connectBtn").hidden = connected;
   $("syncNowBtn").hidden = !connected;
   $("disconnectBtn").hidden = !connected;
@@ -85,14 +120,22 @@ function renderUI() {
     $(id).disabled = syncing;
   });
 
-  $("cloudStatusText").textContent = lastIssue ? lastIssue.message : state.message;
-  $("cloudLastSynced").textContent = meta.lastSyncedAt
-    ? `Last synced: ${formatWhen(meta.lastSyncedAt)}`
-    : "";
-}
+  let message = lastIssue ? lastIssue.message : state.message;
+  if (!lastIssue && key === "pending" && !autoSyncEnabled()) message += " Press Sync Now to upload them.";
+  $("cloudStatusText").textContent = message;
+  $("cloudLastSynced").textContent = meta.lastSyncedAt ? `Last synced: ${formatWhen(meta.lastSyncedAt)}` : "";
 
-function formatWhen(iso) {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  $("syncModeInfo").textContent = autoSyncEnabled()
+    ? "Changes upload about 30 seconds after your last edit, and again when you come back online."
+    : "Nothing is uploaded until you press Sync Now, tap the Sync button, or tap the sync status in the sidebar.";
+
+  // Quick sync button for phones: only when there is something to do
+  const pill = $("syncPill");
+  pill.hidden = !(connected && ["pending", "reconnect", "error", "syncing"].includes(key));
+  pill.dataset.state = state.dot;
+  pill.disabled = syncing;
+  pill.classList.toggle("is-syncing", syncing);
+  $("syncPillLabel").textContent = PILL_LABEL[key] || "Sync";
 }
 
 /* ---------- Errors ---------- */
@@ -346,24 +389,23 @@ async function runSync({ interactive = false } = {}) {
   } finally {
     syncing = false;
     renderUI();
-    // Edits made while syncing still need uploading (scheduleSync mobile par kuch nahi karta)
-    if (!lastIssue && loadMeta().connected && pendingChanges()) scheduleSync(500);
+    // Automatic mode only: edits made while syncing still need uploading
+    if (!lastIssue && loadMeta().connected && pendingChanges()) scheduleSync(5000);
   }
 }
 
-// Auto sync sirf desktop par. Mobile par yahin se return, to koi bhi trigger sync nahi chalayega.
-function scheduleSync(delay = 2000) {
+// Automatic mode only. In manual mode nothing is ever scheduled.
+function scheduleSync(delay = AUTO_DELAY_MS) {
   clearTimeout(timer);
-  if (isMobile()) return;
-  if (!loadMeta().connected || lastIssue) return;
+  if (!autoSyncEnabled() || !loadMeta().connected || lastIssue) return;
   timer = setTimeout(() => runSync({ interactive: false }), delay);
 }
 
 function onDataChange() {
   if (suppressChange) return;
   if (lastIssue && lastIssue.kind === "error") lastIssue = null; // retry after a transient failure
-  renderUI();
-  scheduleSync(); // mobile par ye skip ho jayega
+  renderUI(); // shows "Changes pending"
+  scheduleSync(); // does nothing in manual mode
 }
 
 function disconnect() {
@@ -375,8 +417,57 @@ function disconnect() {
   renderUI();
 }
 
+/* ---------- Extra page elements ---------- */
+
+function buildExtras() {
+  // Quick sync button for phones (bottom left, only shown when there is something to sync)
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    `<button class="sync-pill" id="syncPill" type="button" hidden>${SYNC_ICON}<span id="syncPillLabel">Sync</span></button>`
+  );
+  $("syncPill").addEventListener("click", () => runSync({ interactive: true }));
+
+  // The sidebar status doubles as a sync button
+  const status = $("syncStatus");
+  status.setAttribute("role", "button");
+  status.tabIndex = 0;
+  const trigger = () => {
+    if (loadMeta().connected) runSync({ interactive: true });
+  };
+  status.addEventListener("click", trigger);
+  status.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      trigger();
+    }
+  });
+
+  // "Sync mode" row in Settings, under Cloud Sync
+  $("connectBtn")
+    .closest(".setting-row")
+    .insertAdjacentHTML(
+      "afterend",
+      `
+      <div class="setting-row" id="syncModeRow">
+        <div>
+          <p class="setting-title">Sync mode</p>
+          <p class="muted" id="syncModeInfo"></p>
+        </div>
+        <div class="setting-actions">
+          <select class="input" id="syncMode" aria-label="Sync mode">
+            <option value="manual">Manual (only when I sync)</option>
+            <option value="auto">Automatic (30 seconds after changes)</option>
+          </select>
+        </div>
+      </div>`
+    );
+  $("syncMode").value = autoSyncEnabled() ? "auto" : "manual";
+  $("syncMode").addEventListener("change", (e) => setMode(e.target.value));
+}
+
 export function initSync() {
-  // Buttons: har jagah manual sync (mobile aur desktop dono)
+  buildExtras();
+
   $("connectBtn").addEventListener("click", () => runSync({ interactive: true }));
   $("syncNowBtn").addEventListener("click", () => runSync({ interactive: true }));
   $("disconnectBtn").addEventListener("click", disconnect);
@@ -386,24 +477,15 @@ export function initSync() {
   window.addEventListener("online", () => {
     if (lastIssue && lastIssue.retryOnOnline) lastIssue = null;
     renderUI();
-    scheduleSync(500); // mobile par skip
+    scheduleSync(2000); // automatic mode only
   });
   window.addEventListener("offline", renderUI);
 
-  // Tab par wapas aane par sync: sirf desktop (mobile par ye baar-baar fire hota tha)
+  // Automatic mode only: pick up changes from another device when returning to the tab
   document.addEventListener("visibilitychange", () => {
-    if (isMobile()) return;
-    if (document.visibilityState === "visible" && hasAccessToken()) scheduleSync(300);
-  });
-
-  // Screen size badalne par (rotate/resize) sirf status refresh, sync nahi
-  window.matchMedia(MOBILE_QUERY).addEventListener("change", () => {
-    clearTimeout(timer);
-    renderUI();
+    if (document.visibilityState === "visible" && hasAccessToken()) scheduleSync(2000);
   });
 
   renderUI();
-
-  // Page load par auto sync: sirf desktop
-  if (loadMeta().connected && !isMobile()) runSync({ interactive: false });
+  if (loadMeta().connected && autoSyncEnabled()) runSync({ interactive: false });
 }

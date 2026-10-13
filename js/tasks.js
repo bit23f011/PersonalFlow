@@ -6,7 +6,7 @@ export const BUILTIN_CATEGORIES = ["Personal", "Projects", "Learning", "Work", "
 export const REPEAT_LABEL = { daily: "Daily", weekdays: "Weekdays", weekly: "Weekly", monthly: "Monthly" };
 const REPEATS = Object.keys(REPEAT_LABEL);
 const MAX_CATEGORY_LENGTH = 30;
-const MAX_SUBTASKS = 100;
+const MAX_SUBTASKS = 100; // subtasks and sub-subtasks together
 const MAX_SUBTASK_LENGTH = 200;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -54,19 +54,64 @@ export function resolveCategory(name) {
   return existing || clean;
 }
 
-/* ---------- Subtasks ---------- */
+/* ---------- Subtasks (a subtask can have its own sub-subtasks) ---------- */
 
 // Older tasks have no subtasks field
 export const subtasksOf = (task) => (Array.isArray(task.subtasks) ? task.subtasks : []);
+export const subtaskChildren = (s) => (Array.isArray(s.children) ? s.children : []);
 
+// A subtask with sub-subtasks is done when all of them are done
+const isDone = (s) => {
+  const kids = subtaskChildren(s);
+  return kids.length ? kids.every((c) => c.done) : s.done === true;
+};
+
+// Share of one subtask between 0 and 1: its sub-subtasks, or 0/1 if it has none
+function subtaskRatio(s) {
+  const kids = subtaskChildren(s);
+  if (!kids.length) return s.done ? 1 : 0;
+  return kids.filter((c) => c.done).length / kids.length;
+}
+
+export const subtaskPercent = (s) => Math.round(subtaskRatio(s) * 100);
+
+// Task progress = average of its subtasks' shares
 export function getProgress(task) {
   const subs = subtasksOf(task);
-  const done = subs.filter((s) => s.done).length;
+  const total = subs.length;
+  const sum = subs.reduce((acc, s) => acc + subtaskRatio(s), 0);
   return {
-    done,
-    total: subs.length,
-    percent: subs.length ? Math.round((done / subs.length) * 100) : 0,
+    done: subs.filter(isDone).length,
+    total,
+    percent: total ? Math.round((sum / total) * 100) : 0,
   };
+}
+
+// Ticks or unticks every subtask and sub-subtask
+function setAllDone(subs, value) {
+  return subs.map((s) => {
+    const next = { ...s, done: value };
+    if (subtaskChildren(s).length) next.children = subtaskChildren(s).map((c) => ({ ...c, done: value }));
+    return next;
+  });
+}
+
+// Toggles one subtask or sub-subtask (found by id) and keeps parents in step
+function toggleInTree(subs, id) {
+  return subs.map((s) => {
+    if (s.id === id) {
+      const value = !isDone(s);
+      const next = { ...s, done: value };
+      if (subtaskChildren(s).length) next.children = subtaskChildren(s).map((c) => ({ ...c, done: value }));
+      return next;
+    }
+    const kids = subtaskChildren(s);
+    if (kids.some((c) => c.id === id)) {
+      const children = kids.map((c) => (c.id === id ? { ...c, done: !c.done } : c));
+      return { ...s, children, done: children.every((c) => c.done) };
+    }
+    return s;
+  });
 }
 
 /* ---------- Repeating tasks ---------- */
@@ -102,7 +147,7 @@ function reschedule(task) {
   return {
     ...task,
     dueDate: nextOccurrence(task.dueDate, task.repeat),
-    subtasks: subtasksOf(task).map((s) => ({ ...s, done: false })),
+    subtasks: setAllDone(subtasksOf(task), false),
     completed: false,
     completedCount: (task.completedCount || 0) + 1,
   };
@@ -121,25 +166,47 @@ function randomId(prefix) {
   return `${prefix}-${unique}`;
 }
 
-// Rows from the task form: [{ id, title }]. Known ids keep their ticked state
-// (so renaming a subtask keeps its tick), new rows get a new id and start unticked.
+// Rows from the task form: [{ id, title, children: [{ id, title }] }]. Known ids keep their
+// ticked state (so renaming keeps the tick), new rows get a new id and start unticked.
 function buildSubtasks(rows, existing) {
-  const doneById = new Map(existing.map((s) => [s.id, s.done]));
+  const doneById = new Map();
+  existing.forEach((s) => {
+    doneById.set(s.id, s.done);
+    subtaskChildren(s).forEach((c) => doneById.set(c.id, c.done));
+  });
   const used = new Set();
+  let count = 0;
 
-  return (Array.isArray(rows) ? rows : [])
-    .map((r) => ({
-      id: r && r.id,
-      title: String((r && r.title) || "").trim().slice(0, MAX_SUBTASK_LENGTH),
-    }))
-    .filter((r) => r.title)
-    .slice(0, MAX_SUBTASKS)
-    .map((r) => {
-      const known = Boolean(r.id) && doneById.has(r.id) && !used.has(r.id);
-      const id = known ? r.id : randomId("sub");
-      used.add(id);
-      return { id, title: r.title, done: known ? doneById.get(id) : false };
-    });
+  const make = (row) => {
+    const title = String((row && row.title) || "").trim().slice(0, MAX_SUBTASK_LENGTH);
+    if (!title || count >= MAX_SUBTASKS) return null;
+    const known = Boolean(row.id) && doneById.has(row.id) && !used.has(row.id);
+    const id = known ? row.id : randomId("sub");
+    used.add(id);
+    count += 1;
+    return { id, title, done: known ? doneById.get(id) : false };
+  };
+
+  const result = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const children = [];
+    for (const childRow of Array.isArray(row && row.children) ? row.children : []) {
+      const child = make(childRow);
+      if (child) children.push(child);
+    }
+
+    const item = make(row);
+    if (!item) {
+      result.push(...children); // a sub-subtask whose parent has no title becomes a subtask
+      continue;
+    }
+    if (children.length) {
+      item.children = children;
+      item.done = children.every((c) => c.done);
+    }
+    result.push(item);
+  }
+  return result;
 }
 
 function normalize(fields) {
@@ -184,8 +251,8 @@ export function updateTask(id, fields) {
 
       const subtasks =
         fields.subtasks === undefined ? subtasksOf(t) : buildSubtasks(fields.subtasks, subtasksOf(t));
-      // With subtasks, the task is complete exactly when all of them are ticked
-      const completed = subtasks.length ? subtasks.every((s) => s.done) : t.completed;
+      // With subtasks, the task is complete exactly when all of them are done
+      const completed = subtasks.length ? subtasks.every(isDone) : t.completed;
 
       return settle({ ...t, ...normalize(fields), subtasks, completed, updatedAt: now });
     })
@@ -202,21 +269,21 @@ export function toggleTask(id) {
     getTasks().map((t) => {
       if (t.id !== id) return t;
       const completed = !t.completed;
-      const subtasks = subtasksOf(t).map((s) => ({ ...s, done: completed }));
-      result = settle({ ...t, completed, subtasks, updatedAt: now });
+      result = settle({ ...t, completed, subtasks: setAllDone(subtasksOf(t), completed), updatedAt: now });
       return result;
     })
   );
   return result;
 }
 
+// Works for subtasks and sub-subtasks
 export function toggleSubtask(taskId, subtaskId) {
   const now = new Date().toISOString();
   commitTasks(
     getTasks().map((t) => {
       if (t.id !== taskId) return t;
-      const subtasks = subtasksOf(t).map((s) => (s.id === subtaskId ? { ...s, done: !s.done } : s));
-      const completed = subtasks.length > 0 && subtasks.every((s) => s.done);
+      const subtasks = toggleInTree(subtasksOf(t), subtaskId);
+      const completed = subtasks.length > 0 && subtasks.every(isDone);
       return settle({ ...t, subtasks, completed, updatedAt: now });
     })
   );
@@ -242,7 +309,12 @@ export function duplicateTask(id) {
     ...source,
     id: randomId("task"),
     title: `${source.title} (copy)`.slice(0, 200),
-    subtasks: subtasksOf(source).map((s) => ({ id: randomId("sub"), title: s.title, done: false })),
+    subtasks: subtasksOf(source).map((s) => {
+      const item = { id: randomId("sub"), title: s.title, done: false };
+      const kids = subtaskChildren(s);
+      if (kids.length) item.children = kids.map((c) => ({ id: randomId("sub"), title: c.title, done: false }));
+      return item;
+    }),
     starred: false,
     completed: false,
     completedCount: 0,
@@ -265,7 +337,7 @@ export function completeTasks(ids) {
   changeMany(ids, (t, now) =>
     t.completed
       ? t
-      : settle({ ...t, completed: true, subtasks: subtasksOf(t).map((s) => ({ ...s, done: true })), updatedAt: now })
+      : settle({ ...t, completed: true, subtasks: setAllDone(subtasksOf(t), true), updatedAt: now })
   );
 }
 

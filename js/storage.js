@@ -56,21 +56,38 @@ function cleanCategory(value) {
   return clean || "Other";
 }
 
-// Returns a clean subtask list, or null if the list is malformed
+// One subtask or sub-subtask: { id, title, done }, or null if malformed
+function cleanItem(s) {
+  if (!s || typeof s !== "object") return null;
+  if (typeof s.id !== "string" || !s.id) return null;
+  if (typeof s.title !== "string" || !s.title.trim()) return null;
+  return { id: s.id, title: s.title.trim().slice(0, MAX_SUBTASK_LENGTH), done: s.done === true };
+}
+
+// Returns a clean subtask list (each may have "children"), or null if the list is malformed
 function cleanSubtasks(value) {
   if (value === undefined || value === null) return []; // older data without subtasks
   if (!Array.isArray(value)) return null;
 
   const result = [];
   for (const s of value) {
-    if (!s || typeof s !== "object") return null;
-    if (typeof s.id !== "string" || !s.id) return null;
-    if (typeof s.title !== "string" || !s.title.trim()) return null;
-    result.push({
-      id: s.id,
-      title: s.title.trim().slice(0, MAX_SUBTASK_LENGTH),
-      done: s.done === true,
-    });
+    const item = cleanItem(s);
+    if (!item) return null;
+
+    if (s.children !== undefined && s.children !== null) {
+      if (!Array.isArray(s.children)) return null;
+      const children = [];
+      for (const c of s.children) {
+        const child = cleanItem(c);
+        if (!child) return null;
+        children.push(child);
+      }
+      if (children.length) {
+        item.children = children;
+        item.done = children.every((c) => c.done); // a parent follows its children
+      }
+    }
+    result.push(item);
   }
   return result;
 }

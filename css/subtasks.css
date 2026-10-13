@@ -1,0 +1,48 @@
+/* Nested subtasks (loaded by js/ui.js) */
+
+/* In the task list */
+.subtask-group + .subtask-group {
+  margin-top: 4px;
+}
+
+.subtask-count {
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.sub-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 4px 26px;
+}
+
+.sub-progress .progress-track {
+  height: 6px;
+}
+
+.sub-progress .progress-label {
+  min-width: 34px;
+  font-size: 0.72rem;
+}
+
+.subtask-children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 6px 26px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+}
+
+/* In the task form */
+.subtask-input-row.is-child {
+  margin-left: 28px;
+}
+
+.subtask-input-row.is-child .input {
+  font-size: 0.88rem;
+}

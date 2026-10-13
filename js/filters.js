@@ -23,10 +23,13 @@ const SORTERS = {
   completed: (a, b) => b.updatedAt.localeCompare(a.updatedAt),
 };
 
-// Everything searchable in one lowercase string
+// Everything searchable in one lowercase string (including subtasks and sub-subtasks)
 function searchText(task) {
-  const subtasks = (Array.isArray(task.subtasks) ? task.subtasks : []).map((s) => s.title).join(" ");
-  return `${task.title} ${task.description} ${task.category} ${subtasks}`.toLowerCase();
+  const subs = Array.isArray(task.subtasks) ? task.subtasks : [];
+  const titles = subs
+    .flatMap((s) => [s.title, ...(Array.isArray(s.children) ? s.children.map((c) => c.title) : [])])
+    .join(" ");
+  return `${task.title} ${task.description} ${task.category} ${titles}`.toLowerCase();
 }
 
 export function filterTasks(

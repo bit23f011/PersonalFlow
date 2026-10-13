@@ -2,7 +2,7 @@ import { subscribe, getTasks } from "./state.js";
 import {
   addTask, updateTask, toggleTask, toggleSubtask, toggleStar, deleteTask, duplicateTask, restoreTask, getTask,
   getStats, getTodayTasks, getUpcomingGroups, getCategories,
-  getProgress, subtasksOf, REPEAT_LABEL, todayStr, tomorrowStr,
+  getProgress, subtasksOf, subtaskChildren, subtaskPercent, REPEAT_LABEL, todayStr, tomorrowStr,
 } from "./tasks.js";
 import { filterTasks } from "./filters.js";
 import { confirmAction } from "./dialogs.js";
@@ -39,6 +39,7 @@ const ICON_STAR = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><pat
 const ICON_CHEVRON = '<svg class="icon chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
 const ICON_PLUS = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 const ICON_CLOSE = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+const ICON_INDENT = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v8a3 3 0 0 0 3 3h12M15 11l4 4-4 4"/></svg>';
 
 /* ---------- UI state (not saved) ---------- */
 
@@ -143,7 +144,14 @@ function openCalendar(task) {
   const details = [];
   if (task.description) details.push(task.description);
   const subs = subtasksOf(task);
-  if (subs.length) details.push(subs.map((s) => `${s.done ? "[x]" : "[ ]"} ${s.title}`).join("\n"));
+  if (subs.length) {
+    const lines = [];
+    subs.forEach((s) => {
+      lines.push(`${s.done ? "[x]" : "[ ]"} ${s.title}`);
+      subtaskChildren(s).forEach((c) => lines.push(`    ${c.done ? "[x]" : "[ ]"} ${c.title}`));
+    });
+    details.push(lines.join("\n"));
+  }
   if (details.length) params.set("details", details.join("\n\n"));
 
   window.open(`https://calendar.google.com/calendar/render?${params}`, "_blank", "noopener");
@@ -152,11 +160,13 @@ function openCalendar(task) {
 const categoryOption = (c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`;
 
 function loadStyles() {
-  // The card colour feature brings its own stylesheet
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = "css/colors.css";
-  document.head.appendChild(link);
+  // Card colours and nested subtasks bring their own stylesheets
+  ["css/colors.css", "css/subtasks.css"].forEach((href) => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    document.head.appendChild(link);
+  });
 }
 
 /* ---------- Undo ---------- */
@@ -197,23 +207,47 @@ function progressClass(percent) {
   return "progress-low";
 }
 
+// One checkbox row (a subtask or a sub-subtask)
+function subtaskRow(item, extra = "") {
+  const label = escapeHtml(item.title);
+  return `
+    <div class="subtask${item.done ? " is-done" : ""}">
+      <button class="check check-sm${item.done ? " is-checked" : ""}" type="button" role="checkbox"
+        aria-checked="${item.done}" data-action="subtask" data-sub-id="${escapeHtml(item.id)}"
+        aria-label="${item.done ? "Mark as not done" : "Mark as done"}: ${label}"></button>
+      <span class="subtask-title">${label}</span>${extra}
+    </div>`;
+}
+
+// A subtask, plus its own progress line and sub-subtasks if it has any
+function subtaskGroup(s) {
+  const kids = subtaskChildren(s);
+  if (!kids.length) return `<li class="subtask-group">${subtaskRow(s)}</li>`;
+
+  const percent = subtaskPercent(s);
+  const doneKids = kids.filter((c) => c.done).length;
+  const count = `<span class="subtask-count">${doneKids}/${kids.length}</span>`;
+
+  return `
+    <li class="subtask-group">
+      ${subtaskRow(s, count)}
+      <div class="sub-progress">
+        <div class="progress-track" role="progressbar" aria-label="Progress of ${escapeHtml(s.title)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}">
+          <div class="progress-fill ${progressClass(percent)}" style="width:${percent}%"></div>
+        </div>
+        <span class="progress-label">${percent}%</span>
+      </div>
+      <ul class="subtask-children">
+        ${kids.map((c) => `<li>${subtaskRow(c)}</li>`).join("")}
+      </ul>
+    </li>`;
+}
+
 function progressHtml(task) {
   const { done, total, percent } = getProgress(task);
   if (!total) return "";
 
   const open = expanded.has(task.id);
-  const items = subtasksOf(task)
-    .map(
-      (s) => `
-      <li class="subtask${s.done ? " is-done" : ""}">
-        <button class="check check-sm${s.done ? " is-checked" : ""}" type="button" role="checkbox"
-          aria-checked="${s.done}" data-action="subtask" data-sub-id="${escapeHtml(s.id)}"
-          aria-label="${s.done ? "Mark as not done" : "Mark as done"}: ${escapeHtml(s.title)}"></button>
-        <span class="subtask-title">${escapeHtml(s.title)}</span>
-      </li>`
-    )
-    .join("");
-
   return `
     <div class="progress">
       <div class="progress-track" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}">
@@ -224,7 +258,7 @@ function progressHtml(task) {
     <button class="subtasks-toggle${open ? " is-open" : ""}" type="button" data-action="subtasks" aria-expanded="${open}">
       ${ICON_CHEVRON}${done}/${total} subtasks
     </button>
-    <ul class="subtask-list"${open ? "" : " hidden"}>${items}</ul>`;
+    <ul class="subtask-list"${open ? "" : " hidden"}>${subtasksOf(task).map(subtaskGroup).join("")}</ul>`;
 }
 
 function taskRow(task) {
@@ -516,19 +550,32 @@ function setupRepeatField() {
     );
 }
 
-/* ----- Subtask inputs (one box per subtask) ----- */
+/* ----- Subtask inputs (one box per subtask, with indented boxes for sub-subtasks) ----- */
 
 // "-> Task 1", "- Task 1", "* Task 1" -> "Task 1"
 const cleanLine = (line) => line.replace(/^\s*(?:->|=>|[-*•→])\s*/, "").trim();
 
+const isChildRow = (row) => row.classList.contains("is-child");
+
+// The last row of a subtask's group (the subtask itself, or its last sub-subtask)
+function groupEnd(row) {
+  let last = row;
+  while (last.nextElementSibling && isChildRow(last.nextElementSibling)) last = last.nextElementSibling;
+  return last;
+}
+
 // A row keeps the id of an existing subtask, so renaming it keeps its tick
-function addSubtaskRow({ title = "", id = "", focus = false, after = null } = {}) {
+function addSubtaskRow({ title = "", id = "", focus = false, after = null, child = false } = {}) {
+  const name = child ? "Sub-subtask" : "Subtask";
   const row = document.createElement("div");
-  row.className = "subtask-input-row";
+  row.className = `subtask-input-row${child ? " is-child" : ""}`;
   row.dataset.id = id;
   row.innerHTML =
-    '<input class="input" type="text" maxlength="200" placeholder="Subtask" autocomplete="off" aria-label="Subtask" />' +
-    `<button class="icon-btn" type="button" data-remove aria-label="Remove subtask">${ICON_CLOSE}</button>`;
+    `<input class="input" type="text" maxlength="200" placeholder="${name}" autocomplete="off" aria-label="${name}" />` +
+    (child
+      ? ""
+      : `<button class="icon-btn" type="button" data-add-child title="Add sub-subtask" aria-label="Add sub-subtask">${ICON_INDENT}</button>`) +
+    `<button class="icon-btn" type="button" data-remove aria-label="Remove ${name.toLowerCase()}">${ICON_CLOSE}</button>`;
   row.querySelector("input").value = title; // set as a property: no HTML escaping needed
 
   if (after) after.after(row);
@@ -537,17 +584,30 @@ function addSubtaskRow({ title = "", id = "", focus = false, after = null } = {}
   return row;
 }
 
+// [{ id, title, children: [{ id, title }] }]
 function readSubtaskRows() {
-  return [...$("subtaskInputs").querySelectorAll(".subtask-input-row")].map((row) => ({
-    id: row.dataset.id,
-    title: row.querySelector("input").value,
-  }));
+  const result = [];
+  $("subtaskInputs")
+    .querySelectorAll(".subtask-input-row")
+    .forEach((row) => {
+      const item = { id: row.dataset.id, title: row.querySelector("input").value };
+      const parent = result[result.length - 1];
+      if (isChildRow(row) && parent) parent.children.push(item);
+      else result.push({ ...item, children: [] });
+    });
+  return result;
 }
 
 function setSubtaskRows(subtasks) {
   $("subtaskInputs").innerHTML = "";
-  if (subtasks.length) subtasks.forEach((s) => addSubtaskRow({ title: s.title, id: s.id }));
-  else addSubtaskRow(); // always start with one box
+  if (!subtasks.length) {
+    addSubtaskRow(); // always start with one box
+    return;
+  }
+  subtasks.forEach((s) => {
+    addSubtaskRow({ title: s.title, id: s.id });
+    subtaskChildren(s).forEach((c) => addSubtaskRow({ title: c.title, id: c.id, child: true }));
+  });
 }
 
 // Adds the "Subtasks" section (boxes + add button) under the description
@@ -560,30 +620,49 @@ function setupSubtasksField() {
         '<span class="field-label" id="subtasksLabel">Subtasks</span>' +
         '<div class="subtask-inputs" id="subtaskInputs"></div>' +
         `<button class="btn btn-ghost btn-sm" id="addSubtaskBtn" type="button">${ICON_PLUS} Add subtask</button>` +
-        '<p class="muted">Progress is calculated from the ticked subtasks.</p>' +
+        '<p class="muted">Use the indent button to add a sub-subtask. Progress is calculated from the ticked items.</p>' +
         "</div>"
     );
 
   const box = $("subtaskInputs");
 
-  $("addSubtaskBtn").addEventListener("click", () => addSubtaskRow({ focus: true }));
-
-  // Remove button
-  box.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-remove]");
-    if (!btn) return;
-    const row = btn.closest(".subtask-input-row");
-    const neighbour = row.nextElementSibling || row.previousElementSibling;
-    row.remove();
-    if (!box.children.length) addSubtaskRow({ focus: true });
-    else if (neighbour) neighbour.querySelector("input").focus();
+  $("addSubtaskBtn").addEventListener("click", () => {
+    const last = box.lastElementChild;
+    addSubtaskRow({ focus: true, after: last || null });
   });
 
-  // Enter adds a new box below (and does not submit the form)
+  box.addEventListener("click", (e) => {
+    const row = e.target.closest(".subtask-input-row");
+    if (!row) return;
+
+    // Indent button: a new sub-subtask at the end of this subtask's group
+    if (e.target.closest("[data-add-child]")) {
+      addSubtaskRow({ child: true, focus: true, after: groupEnd(row) });
+      return;
+    }
+
+    // Remove button (removing a subtask also removes its sub-subtasks)
+    if (e.target.closest("[data-remove]")) {
+      const neighbour = groupEnd(row).nextElementSibling || row.previousElementSibling;
+      if (!isChildRow(row)) {
+        while (row.nextElementSibling && isChildRow(row.nextElementSibling)) row.nextElementSibling.remove();
+      }
+      row.remove();
+      if (!box.children.length) addSubtaskRow({ focus: true });
+      else if (neighbour && neighbour.isConnected) neighbour.querySelector("input").focus();
+    }
+  });
+
+  // Enter adds a new box below (a sub-subtask stays a sub-subtask) and does not submit the form
   box.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" || !e.target.matches("input")) return;
     e.preventDefault();
-    addSubtaskRow({ focus: true, after: e.target.closest(".subtask-input-row") });
+    const row = e.target.closest(".subtask-input-row");
+    addSubtaskRow({
+      focus: true,
+      child: isChildRow(row),
+      after: isChildRow(row) ? row : groupEnd(row),
+    });
   });
 
   // Pasting several lines creates one box per line
@@ -596,14 +675,17 @@ function setupSubtasksField() {
     if (!lines.length) return;
     e.preventDefault();
 
-    let row = input.closest(".subtask-input-row");
+    const current = input.closest(".subtask-input-row");
+    const child = isChildRow(current);
+    let row = child ? current : groupEnd(current);
     let rest = lines;
     if (!input.value.trim()) {
       input.value = lines[0];
       rest = lines.slice(1);
+      row = child ? current : groupEnd(current);
     }
     rest.forEach((title) => {
-      row = addSubtaskRow({ title, after: row });
+      row = addSubtaskRow({ title, child, after: row });
     });
   });
 }

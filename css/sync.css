@@ -14,6 +14,17 @@
 
 /* local / offline keep the default muted dot */
 
+/* The status doubles as a sync button when connected */
+.sync-status.is-clickable {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.sync-status.is-clickable:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
 /* Settings: cloud row */
 .setting-row + .setting-row {
   border-top: 1px solid var(--border);
@@ -28,6 +39,55 @@
 .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* Quick sync button (phones only) */
+.sync-pill {
+  position: fixed;
+  left: 16px;
+  bottom: calc(var(--bottom-nav-h) + 16px + env(safe-area-inset-bottom));
+  z-index: 25;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.18);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.sync-pill[data-state="error"] {
+  border-color: var(--coral);
+}
+
+.sync-pill:disabled {
+  opacity: 0.75;
+}
+
+.sync-pill.is-syncing .icon {
+  animation: sync-spin 1s linear infinite;
+}
+
+@keyframes sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .sync-pill:not([hidden]) {
+    display: inline-flex;
+  }
+}
+
+.sync-pill[hidden],
+body.has-bulkbar .sync-pill {
+  display: none !important;
 }
 
 /* Sync dialog */
