@@ -55,6 +55,9 @@ const EMPTY_TEXT = {
 const ui = { view: "overview", category: null, highOnly: false, starredOnly: false, query: "" };
 const expanded = new Set(); // ids of tasks whose subtask list is open
 
+// Screens added by other modules (Calendar, Stats, Bugs...): { element, onShow }
+const extraViews = new Map();
+
 /* ---------- Helpers ---------- */
 
 const pad = (n) => String(n).padStart(2, "0");
@@ -85,6 +88,14 @@ function formatShort(dateStr) {
 function formatTime(time) {
   const [h, m] = time.split(":").map(Number);
   return new Date(2000, 0, 1, h, m).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+// 85 -> "1h 25m", 40 -> "40m"
+export function formatMinutes(total) {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (!h) return `${m}m`;
+  return m ? `${h}h ${m}m` : `${h}h`;
 }
 
 function isOverdue(task) {
@@ -152,6 +163,7 @@ function openCalendar(task) {
     });
     details.push(lines.join("\n"));
   }
+  if (Array.isArray(task.links) && task.links.length) details.push(task.links.join("\n"));
   if (details.length) params.set("details", details.join("\n\n"));
 
   window.open(`https://calendar.google.com/calendar/render?${params}`, "_blank", "noopener");
@@ -160,8 +172,8 @@ function openCalendar(task) {
 const categoryOption = (c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`;
 
 function loadStyles() {
-  // Card colours and nested subtasks bring their own stylesheets
-  ["css/colors.css", "css/subtasks.css"].forEach((href) => {
+  // Card colours, nested subtasks and task extras (links, time) bring their own stylesheets
+  ["css/colors.css", "css/subtasks.css", "css/extras.css"].forEach((href) => {
     const link = document.createElement("link");
     link.rel = "stylesheet";
     link.href = href;
@@ -261,6 +273,25 @@ function progressHtml(task) {
     <ul class="subtask-list"${open ? "" : " hidden"}>${subtasksOf(task).map(subtaskGroup).join("")}</ul>`;
 }
 
+// Link chips: only the website name is shown, a click opens the link in a new tab
+function linksHtml(task) {
+  const links = Array.isArray(task.links) ? task.links : [];
+  if (!links.length) return "";
+
+  const chips = links
+    .map((href) => {
+      let host = href;
+      try {
+        host = new URL(href).hostname.replace(/^www\./, "");
+      } catch {
+        // keep the full text
+      }
+      return `<a class="link-chip" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(href)}">${escapeHtml(host)}</a>`;
+    })
+    .join("");
+  return `<div class="link-list">${chips}</div>`;
+}
+
 function taskRow(task) {
   const due = dueInfo(task);
   const title = escapeHtml(task.title);
@@ -273,6 +304,10 @@ function taskRow(task) {
   const repeatHtml = REPEAT_LABEL[task.repeat]
     ? `<span class="meta-item">↻ ${REPEAT_LABEL[task.repeat]}${task.completedCount ? ` · done ${task.completedCount}×` : ""}</span>`
     : "";
+  const timeHtml =
+    task.focusMinutes > 0
+      ? `<span class="meta-item" title="Time tracked with the Focus timer">⏱ ${formatMinutes(task.focusMinutes)}</span>`
+      : "";
   const calendarBtn = task.dueDate
     ? `<button class="icon-btn" type="button" data-action="calendar" title="Add to Google Calendar" aria-label="Add to Google Calendar: ${title}">${ICON_CALENDAR}</button>`
     : "";
@@ -290,8 +325,10 @@ function taskRow(task) {
           <span class="meta-item"><span class="dot ${dotClass(task.category)}"></span>${escapeHtml(task.category)}</span>
           ${dueHtml}
           ${repeatHtml}
+          ${timeHtml}
         </div>
         ${progressHtml(task)}
+        ${linksHtml(task)}
       </div>
       <button class="icon-btn star-btn${starred ? " is-starred" : ""}" type="button" data-action="star"
         aria-pressed="${starred}" title="${starred ? "Unstar" : "Star"}"
@@ -411,8 +448,14 @@ function render() {
   $("viewOverview").hidden = ui.view !== "overview";
   $("viewList").hidden = !isList;
   $("viewSettings").hidden = ui.view !== "settings";
-  syncNav();
 
+  extraViews.forEach(({ element, onShow }, name) => {
+    const on = ui.view === name;
+    element.hidden = !on;
+    if (on && onShow) onShow();
+  });
+
+  syncNav();
   if (ui.view === "overview") renderOverview();
   else if (isList) renderList(categories);
 }
@@ -437,6 +480,16 @@ function onNavClick(e) {
   if (!el) return;
   if (el.dataset.category) go("tasks", el.dataset.category);
   else go(el.dataset.view);
+}
+
+// For other modules: add a screen. Any button with data-view="<name>" then opens it.
+export function registerView(name, element, onShow) {
+  element.hidden = true;
+  extraViews.set(name, { element, onShow });
+}
+
+export function navigate(view) {
+  go(view);
 }
 
 /* ---------- Task dialog ---------- */
@@ -610,7 +663,8 @@ function setSubtaskRows(subtasks) {
   });
 }
 
-// Adds the "Subtasks" section (boxes + add button) under the description
+// Adds the "Subtasks" section (boxes + add button) under the description,
+// and the "Links" box under it
 function setupSubtasksField() {
   $("fieldDescription")
     .closest(".field")
@@ -621,6 +675,10 @@ function setupSubtasksField() {
         '<div class="subtask-inputs" id="subtaskInputs"></div>' +
         `<button class="btn btn-ghost btn-sm" id="addSubtaskBtn" type="button">${ICON_PLUS} Add subtask</button>` +
         '<p class="muted">Use the indent button to add a sub-subtask. Progress is calculated from the ticked items.</p>' +
+        "</div>" +
+        '<div class="field">' +
+        '<label for="fieldLinks">Links (one per line)</label>' +
+        '<textarea class="input" id="fieldLinks" rows="2" placeholder="figma.com/file/abc&#10;https://github.com/me/repo" spellcheck="false"></textarea>' +
         "</div>"
     );
 
@@ -720,6 +778,7 @@ function openDialog(task = null) {
   $("fieldTitle").value = task ? task.title : "";
   $("fieldDescription").value = task ? task.description : "";
   setSubtaskRows(task ? subtasksOf(task) : []);
+  $("fieldLinks").value = task && Array.isArray(task.links) ? task.links.join("\n") : "";
   $("fieldPriority").value = task ? task.priority : "medium";
   $("fieldCategory").value = task ? task.category : defaultCategory;
   applyColor(task ? normalizeHex(task.color) : "");
@@ -763,6 +822,7 @@ function onSubmit(e) {
     title,
     description: $("fieldDescription").value,
     subtasks: readSubtaskRows(), // empty boxes are ignored
+    links: $("fieldLinks").value.split(/\r?\n/), // invalid lines are ignored
     priority: $("fieldPriority").value,
     category,
     color: selectedColor,
@@ -776,7 +836,7 @@ function onSubmit(e) {
   dialog.close();
 }
 
-// Opens the edit dialog for a task (used by the alerts panel)
+// Opens the edit dialog for a task (used by the alerts panel and other modules)
 export function editTask(id) {
   const task = getTask(id);
   if (task) openDialog(task);

@@ -18,9 +18,20 @@ export function getTasks() {
   return data.tasks;
 }
 
+// Older saved data has no bugs list
+export function getBugs() {
+  return Array.isArray(data.bugs) ? data.bugs : [];
+}
+
 // Local edit: bumps the document timestamp
 export function commitTasks(tasks) {
   data.tasks = tasks;
+  data.updatedAt = new Date().toISOString();
+  persistAndNotify();
+}
+
+export function commitBugs(bugs) {
+  data.bugs = bugs;
   data.updatedAt = new Date().toISOString();
   persistAndNotify();
 }
@@ -30,6 +41,7 @@ export function replaceData(next) {
   data.version = next.version;
   data.updatedAt = next.updatedAt;
   data.tasks = next.tasks;
+  data.bugs = Array.isArray(next.bugs) ? next.bugs : [];
   data.settings = next.settings || {};
   persistAndNotify();
 }

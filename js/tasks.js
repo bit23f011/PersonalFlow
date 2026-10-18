@@ -8,6 +8,8 @@ const REPEATS = Object.keys(REPEAT_LABEL);
 const MAX_CATEGORY_LENGTH = 30;
 const MAX_SUBTASKS = 100; // subtasks and sub-subtasks together
 const MAX_SUBTASK_LENGTH = 200;
+const MAX_LINKS = 10;
+const MAX_DONE_DATES = 200;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
@@ -52,6 +54,32 @@ export function resolveCategory(name) {
   if (!clean) return "Other";
   const existing = getCategories().find((c) => c.toLowerCase() === clean.toLowerCase());
   return existing || clean;
+}
+
+/* ---------- Links ---------- */
+
+// Lines or an array -> valid http(s) links ("figma.com/x" becomes "https://figma.com/x")
+function cleanLinks(value) {
+  const lines = Array.isArray(value) ? value : String(value || "").split(/\r?\n/);
+  const result = [];
+
+  for (const line of lines) {
+    let text = String(line || "").trim();
+    if (!text) continue;
+    if (!/^https?:\/\//i.test(text)) text = `https://${text}`;
+    try {
+      const url = new URL(text);
+      const host = url.hostname;
+      const looksReal = host === "localhost" || host.includes(".");
+      if (["http:", "https:"].includes(url.protocol) && looksReal && url.href.length <= 500 && !result.includes(url.href)) {
+        result.push(url.href);
+      }
+    } catch {
+      // not a link: ignored
+    }
+    if (result.length >= MAX_LINKS) break;
+  }
+  return result;
 }
 
 /* ---------- Subtasks (a subtask can have its own sub-subtasks) ---------- */
@@ -142,19 +170,32 @@ function nextOccurrence(dueDate, repeat) {
   return next;
 }
 
-// A finished repeating task goes back to "to do" on its next date, with fresh subtasks
+// A finished repeating task goes back to "to do" on its next date, with fresh subtasks.
+// Today is added to its history of finished days (used for streaks and stats).
 function reschedule(task) {
+  const history = Array.isArray(task.doneDates) ? task.doneDates : [];
   return {
     ...task,
     dueDate: nextOccurrence(task.dueDate, task.repeat),
     subtasks: setAllDone(subtasksOf(task), false),
     completed: false,
+    completedAt: "",
+    doneDates: [...history, todayStr()].slice(-MAX_DONE_DATES),
     completedCount: (task.completedCount || 0) + 1,
   };
 }
 
 function settle(task) {
   return task.repeat && task.dueDate && task.completed ? reschedule(task) : task;
+}
+
+// After any change: remember when a task was finished (or forget it when reopened),
+// then move repeating tasks on to their next date
+function finalize(prev, next, now) {
+  let task = next;
+  if (task.completed && !prev.completed) task = { ...task, completedAt: now };
+  else if (!task.completed && prev.completed) task = { ...task, completedAt: "" };
+  return settle(task);
 }
 
 /* ---------- CRUD ---------- */
@@ -217,6 +258,7 @@ function normalize(fields) {
     priority: PRIORITIES.includes(fields.priority) ? fields.priority : "medium",
     category: resolveCategory(fields.category),
     color: normalizeHex(fields.color),
+    links: cleanLinks(fields.links),
     dueDate,
     // A time and a repeat only make sense together with a date
     dueTime: dueDate && TIME_RE.test(fields.dueTime || "") ? fields.dueTime : "",
@@ -236,7 +278,11 @@ export function addTask(fields) {
     subtasks: buildSubtasks(fields.subtasks, []),
     starred: false,
     completed: false,
+    completedAt: "",
     completedCount: 0,
+    doneDates: [],
+    focusMinutes: 0,
+    focusDate: "",
     createdAt: now,
     updatedAt: now,
   };
@@ -254,7 +300,7 @@ export function updateTask(id, fields) {
       // With subtasks, the task is complete exactly when all of them are done
       const completed = subtasks.length ? subtasks.every(isDone) : t.completed;
 
-      return settle({ ...t, ...normalize(fields), subtasks, completed, updatedAt: now });
+      return finalize(t, { ...t, ...normalize(fields), subtasks, completed, updatedAt: now }, now);
     })
   );
 }
@@ -269,7 +315,7 @@ export function toggleTask(id) {
     getTasks().map((t) => {
       if (t.id !== id) return t;
       const completed = !t.completed;
-      result = settle({ ...t, completed, subtasks: setAllDone(subtasksOf(t), completed), updatedAt: now });
+      result = finalize(t, { ...t, completed, subtasks: setAllDone(subtasksOf(t), completed), updatedAt: now }, now);
       return result;
     })
   );
@@ -284,7 +330,7 @@ export function toggleSubtask(taskId, subtaskId) {
       if (t.id !== taskId) return t;
       const subtasks = toggleInTree(subtasksOf(t), subtaskId);
       const completed = subtasks.length > 0 && subtasks.every(isDone);
-      return settle({ ...t, subtasks, completed, updatedAt: now });
+      return finalize(t, { ...t, subtasks, completed, updatedAt: now }, now);
     })
   );
 }
@@ -298,8 +344,8 @@ export function deleteTask(id) {
   commitTasks(getTasks().filter((t) => t.id !== id));
 }
 
-// Copy of a task: same details (and colour), subtasks unticked, " (copy)" added to the title.
-// Returns the new id.
+// Copy of a task: same details (colour, links), subtasks unticked, " (copy)" added to the title.
+// History and tracked time start again. Returns the new id.
 export function duplicateTask(id) {
   const source = getTask(id);
   if (!source) return null;
@@ -317,12 +363,49 @@ export function duplicateTask(id) {
     }),
     starred: false,
     completed: false,
+    completedAt: "",
     completedCount: 0,
+    doneDates: [],
+    focusMinutes: 0,
+    focusDate: "",
     createdAt: now,
     updatedAt: now,
   };
   commitTasks([...getTasks(), copy]);
   return copy.id;
+}
+
+/* ---------- Time tracking and "today's focus" ---------- */
+
+// Adds focus minutes (from the Focus timer) to a task
+export function addFocusTime(id, minutes) {
+  const add = Math.round(Number(minutes));
+  if (!Number.isFinite(add) || add <= 0 || !getTask(id)) return;
+  const now = new Date().toISOString();
+  commitTasks(
+    getTasks().map((t) => (t.id === id ? { ...t, focusMinutes: (t.focusMinutes || 0) + add, updatedAt: now } : t))
+  );
+}
+
+// Marks exactly these tasks as today's focus (the others lose the mark)
+export function setFocusToday(ids) {
+  const set = new Set(ids);
+  const today = todayStr();
+  const now = new Date().toISOString();
+  commitTasks(
+    getTasks().map((t) => {
+      const on = set.has(t.id);
+      if (on && t.focusDate !== today) return { ...t, focusDate: today, updatedAt: now };
+      if (!on && t.focusDate === today) return { ...t, focusDate: "", updatedAt: now };
+      return t;
+    })
+  );
+}
+
+// Tasks picked as today's focus (finished ones included, so progress stays visible)
+export function getFocusTasks() {
+  const today = todayStr();
+  return getTasks().filter((t) => t.focusDate === today);
 }
 
 /* ---------- Bulk changes (one save for many tasks) ---------- */
@@ -337,7 +420,7 @@ export function completeTasks(ids) {
   changeMany(ids, (t, now) =>
     t.completed
       ? t
-      : settle({ ...t, completed: true, subtasks: setAllDone(subtasksOf(t), true), updatedAt: now })
+      : finalize(t, { ...t, completed: true, subtasks: setAllDone(subtasksOf(t), true), updatedAt: now }, now)
   );
 }
 

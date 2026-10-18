@@ -1,4 +1,5 @@
 import { getTasks } from "./state.js";
+import { addFocusTime } from "./tasks.js";
 import { showToast } from "./toast.js";
 import { confirmAction } from "./dialogs.js";
 
@@ -182,7 +183,10 @@ function finish(credited, { silent = false } = {}) {
       day.sessions += 1;
       day.minutes += data.settings.focus;
       data.stats[key] = day;
-      if (t.taskId) data.taskSessions[t.taskId] = (data.taskSessions[t.taskId] || 0) + 1;
+      if (t.taskId) {
+        data.taskSessions[t.taskId] = (data.taskSessions[t.taskId] || 0) + 1;
+        addFocusTime(t.taskId, data.settings.focus); // time tracking: saved with the task (and synced)
+      }
       t.cycle += 1;
     }
     next = credited && t.cycle % data.settings.every === 0 ? "long" : "short";

@@ -1,0 +1,400 @@
+/* Calendar, Stats and Today's focus (loaded by js/insights.js) */
+
+/* ---------- Bottom navigation with more than 4 items ---------- */
+@media (max-width: 760px) {
+  .bottom-nav {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+
+  .bn-item span {
+    font-size: 0.66rem;
+  }
+}
+
+/* ---------- Calendar ---------- */
+.cal-head {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cal-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.cal-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.cal-dow {
+  padding: 8px 4px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.cal-day {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  min-height: 96px;
+  padding: 6px;
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cal-day:hover {
+  background: var(--surface-2);
+}
+
+.cal-day.is-other {
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.cal-day.is-selected {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.cal-num {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.cal-day.is-today .cal-num {
+  background: var(--accent);
+  color: #fff;
+}
+
+.cal-chip {
+  display: block;
+  padding: 1px 6px;
+  overflow: hidden;
+  background: var(--task-tint, var(--accent-soft));
+  border-radius: 4px;
+  box-shadow: inset 3px 0 0 var(--task-color, var(--accent));
+  color: var(--text);
+  font-size: 0.7rem;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-chip.is-done {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.cal-chip.is-ghost {
+  font-style: italic;
+  opacity: 0.55;
+}
+
+.cal-more {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.cal-dots {
+  display: none;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.cal-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--task-color, var(--accent));
+  border-radius: 50%;
+}
+
+.cal-panel {
+  padding: 8px 16px 16px;
+}
+
+.cal-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.cal-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 8px 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--task-tint, transparent);
+  box-shadow: inset 4px 0 0 var(--task-color, transparent);
+}
+
+.cal-item.is-done .cal-item-title {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.cal-ghost-mark {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.cal-item-main,
+.focus-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.cal-item-title,
+.focus-title {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.cal-item-meta,
+.focus-meta {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.cal-empty {
+  padding: 16px 0 8px;
+}
+
+.cal-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cal-add .input {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .cal-day {
+    align-items: center;
+    min-height: 54px;
+    padding: 4px 2px;
+  }
+
+  .cal-chip,
+  .cal-more {
+    display: none;
+  }
+
+  .cal-dots {
+    display: flex;
+    justify-content: center;
+  }
+}
+
+/* ---------- Stats ---------- */
+.stat-unit {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 16px;
+}
+
+.bar-col {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bar-track {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  max-width: 44px;
+  height: 120px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+
+.bar-fill {
+  width: 100%;
+  background: var(--accent);
+  border-radius: 8px 8px 0 0;
+  transition: height 300ms ease;
+}
+
+.bar-fill.is-today {
+  background: #3a9d6e;
+}
+
+.bar-value {
+  min-height: 1em;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.bar-label {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.habit-row,
+.time-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.habit-row:last-child,
+.time-row:last-child {
+  border-bottom: none;
+}
+
+.habit-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.habit-meta {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.time-bar {
+  flex: 0 0 90px;
+  height: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: 999px;
+}
+
+.time-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.stats-note {
+  font-size: 0.8rem;
+}
+
+@media (max-width: 760px) {
+  .time-bar {
+    display: none;
+  }
+}
+
+/* ---------- Today's focus ---------- */
+.focus-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.focus-summary .progress-label {
+  min-width: 80px;
+}
+
+.focus-list {
+  margin: 0;
+  padding: 0;
+}
+
+.focus-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--task-tint, transparent);
+  box-shadow: inset 4px 0 0 var(--task-color, transparent);
+}
+
+.focus-item:last-child {
+  border-bottom: none;
+}
+
+.focus-item.is-done .focus-title {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.focus-cheer {
+  padding: 0 16px 14px;
+  text-align: center;
+}
+
+.focus-options {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.focus-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.focus-option input {
+  margin-top: 4px;
+}
+
+.focus-option > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#focusDialog .modal-actions {
+  flex-wrap: wrap;
+}
