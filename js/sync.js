@@ -35,6 +35,17 @@ let timer = null;
 let lastIssue = null; // { kind: "auth" | "error" | "decision", state, message, retryOnOnline? }
 let suppressChange = false;
 
+/* ---------- What a document holds ---------- */
+
+const bugCount = (data) => (Array.isArray(data.bugs) ? data.bugs.length : 0);
+const hasContent = (data) => data.tasks.length > 0 || bugCount(data) > 0;
+
+// "12 tasks, 3 bugs"
+function describe(data) {
+  const bugs = bugCount(data);
+  return `${data.tasks.length} tasks${bugs ? `, ${bugs} bugs` : ""}`;
+}
+
 /* ---------- Sync mode ---------- */
 
 function autoSyncEnabled() {
@@ -214,6 +225,7 @@ function buildPayload() {
     version: d.version,
     updatedAt: d.updatedAt,
     tasks: d.tasks,
+    bugs: Array.isArray(d.bugs) ? d.bugs : [],
     settings: { theme: localStorage.getItem("personalflow-theme") || "system" },
   };
 }
@@ -238,7 +250,7 @@ async function uploadLocal(token, fileId) {
 
 function useCloud(cloudData, fileId) {
   const local = getData();
-  if (local.tasks.length) saveRecoveryCopy("This device, before loading Google Drive data", local);
+  if (hasContent(local)) saveRecoveryCopy("This device, before loading Google Drive data", local);
 
   suppressChange = true;
   try {
@@ -308,7 +320,7 @@ async function reconcile(token) {
   }
 
   const base = meta.syncedUpdatedAt || null; // document timestamp at the last successful sync
-  const localChanged = base ? local.updatedAt !== base : local.tasks.length > 0;
+  const localChanged = base ? local.updatedAt !== base : hasContent(local);
   const cloudChanged = base ? cloudData.updatedAt !== base : true;
 
   // Only this device changed: cloud is not newer, safe to upload
@@ -321,7 +333,7 @@ async function reconcile(token) {
   if (!localChanged && cloudChanged) {
     const choice = await askDecision(
       "Newer data in Google Drive",
-      `Google Drive has ${cloudData.tasks.length} tasks (saved ${formatWhen(cloudData.updatedAt)}). Load it onto this device? Your current data here is kept as a recovery copy.`,
+      `Google Drive has ${describe(cloudData)} (saved ${formatWhen(cloudData.updatedAt)}). Load it onto this device? Your current data here is kept as a recovery copy.`,
       [
         { id: "cloud", label: "Load Google Drive data", primary: true },
         { id: "later", label: "Not now" },
@@ -336,8 +348,8 @@ async function reconcile(token) {
   const cloudNewer = cloudData.updatedAt > local.updatedAt;
   const choice = await askDecision(
     "Sync conflict",
-    `This device has ${local.tasks.length} tasks (edited ${formatWhen(local.updatedAt)}). ` +
-      `Google Drive has ${cloudData.tasks.length} tasks (edited ${formatWhen(cloudData.updatedAt)}). ` +
+    `This device has ${describe(local)} (edited ${formatWhen(local.updatedAt)}). ` +
+      `Google Drive has ${describe(cloudData)} (edited ${formatWhen(cloudData.updatedAt)}). ` +
       `${cloudNewer ? "The Google Drive version is newer." : "This device's version is newer."} ` +
       `The version you don't choose is kept as a recovery copy on this device.`,
     [

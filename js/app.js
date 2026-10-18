@@ -4,6 +4,7 @@ import { initUI } from "./ui.js";
 import { initBulk } from "./bulk.js";
 import { initQuickAdd } from "./quickadd.js";
 import { initInsights } from "./insights.js";
+import { initBugs } from "./bugs.js";
 import { initPomodoro } from "./pomodoro.js";
 import { initAlerts } from "./alerts.js";
 import { initSync } from "./sync.js";
@@ -61,6 +62,7 @@ function init() {
   initBulk(); // after initUI: it re-applies the selection after every list redraw
   initQuickAdd();
   initInsights(); // Calendar, Stats and Today's focus (needs initUI first)
+  initBugs(); // the bug tracker (needs initUI first)
   initPomodoro();
   initAlerts();
   initSync();

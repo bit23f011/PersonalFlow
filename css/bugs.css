@@ -1,0 +1,349 @@
+/* Bug tracker (loaded by js/bugs.js) */
+
+/* Severity colours, used by badges, cards and the dialog */
+.sev-critical { --sev: #d9363e; --sev-tint: rgba(217, 54, 62, 0.14); }
+.sev-high { --sev: #f4675e; --sev-tint: rgba(244, 103, 94, 0.14); }
+.sev-medium { --sev: #d1964a; --sev-tint: rgba(209, 150, 74, 0.16); }
+.sev-low { --sev: #78909c; --sev-tint: rgba(120, 144, 156, 0.16); }
+
+.sev-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  background: var(--sev-tint);
+  border-radius: 999px;
+  color: var(--sev);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bug-head {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ---------- Board ---------- */
+.bug-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.bug-toolbar .input {
+  width: auto;
+  flex: 1 1 180px;
+  max-width: 280px;
+}
+
+.bug-toolbar .btn-sm {
+  align-self: auto;
+  margin-left: auto;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  gap: 14px;
+  align-items: start;
+  padding-bottom: 8px;
+  overflow-x: auto;
+}
+
+.board-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 140px;
+  padding: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.board-col.is-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+.board-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 0 4px;
+}
+
+.board-col-head h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.board-count {
+  margin-left: 4px;
+  padding: 0 7px;
+  background: var(--surface);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.board-empty {
+  padding: 8px 4px;
+  font-size: 0.82rem;
+}
+
+.bug-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--sev);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  cursor: grab;
+}
+
+.bug-card:hover {
+  border-color: var(--sev);
+}
+
+.bug-card.is-dragging {
+  opacity: 0.45;
+}
+
+.bug-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.bug-project {
+  padding: 1px 8px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.bug-card-title {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.bug-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bug-progress .progress-track,
+.bug-row-progress .progress-track,
+.bug-overall .progress-track {
+  flex: 1;
+}
+
+.bug-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+.bug-moves {
+  display: flex;
+  gap: 2px;
+}
+
+.bug-moves .icon-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.bug-moves .icon-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ---------- Home ---------- */
+.bug-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.bug-hbars {
+  padding: 8px 0;
+}
+
+.hbar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+}
+
+.hbar-label {
+  flex: 0 0 90px;
+  font-size: 0.85rem;
+}
+
+.hbar-track {
+  flex: 1;
+  height: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: 999px;
+}
+
+.hbar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 300ms ease;
+}
+
+.hbar-value {
+  min-width: 22px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+.bug-overall {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 16px;
+}
+
+.bug-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.bug-row:last-child {
+  border-bottom: none;
+}
+
+.bug-row:hover {
+  background: var(--surface-2);
+}
+
+.bug-row-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bug-row-title {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.bug-row-meta {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.bug-row-progress {
+  display: flex;
+  flex: 0 0 150px;
+  align-items: center;
+  gap: 8px;
+}
+
+.bug-more {
+  padding: 12px 16px;
+  font-size: 0.85rem;
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.project-row:last-child {
+  border-bottom: none;
+}
+
+.project-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.project-meta {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.bug-empty-btn {
+  margin-top: 12px;
+}
+
+/* ---------- Bug dialog ---------- */
+.bug-dialog {
+  width: min(560px, calc(100% - 32px));
+  border-top: 5px solid var(--sev, var(--border));
+}
+
+.bug-step .bug-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.bug-actions {
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.bug-spacer {
+  flex: 1;
+}
+
+/* ---------- Phones ---------- */
+@media (max-width: 760px) {
+  .bug-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* the board scrolls sideways, one column at a time */
+  .board {
+    grid-template-columns: repeat(4, 82vw);
+    scroll-snap-type: x mandatory;
+  }
+
+  .board-col {
+    scroll-snap-align: start;
+  }
+
+  .bug-row {
+    flex-wrap: wrap;
+  }
+
+  .bug-row-progress {
+    flex: 1 1 100%;
+  }
+
+  .hbar-label {
+    flex-basis: 76px;
+  }
+}
