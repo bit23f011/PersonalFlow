@@ -6,6 +6,7 @@ import { validateData, saveRecoveryCopy } from "./storage.js";
 const META_KEY = "personalflow-sync";
 const MODE_KEY = "personalflow-sync-mode"; // "manual" (default) or "auto", per device
 const AUTO_DELAY_MS = 30_000; // automatic mode: wait this long after the last change
+const RETRY_COOLDOWN_MS = 60_000; // after a failed background sync, do not try again for this long
 
 const $ = (id) => document.getElementById(id);
 
@@ -34,6 +35,7 @@ let syncing = false;
 let timer = null;
 let lastIssue = null; // { kind: "auth" | "error" | "decision", state, message, retryOnOnline? }
 let suppressChange = false;
+let blockedUntil = 0; // background syncs wait until this time after a failure
 
 /* ---------- What a document holds ---------- */
 
@@ -63,7 +65,7 @@ function setMode(mode) {
     console.error("Could not save the sync mode", err);
   }
   clearTimeout(timer);
-  if (autoSyncEnabled()) scheduleSync(2000); // switching to automatic: sync soon
+  if (autoSyncEnabled()) scheduleSync(2000); // switching to automatic: sync soon (only with a valid sign-in)
   renderUI();
 }
 
@@ -137,7 +139,7 @@ function renderUI() {
   $("cloudLastSynced").textContent = meta.lastSyncedAt ? `Last synced: ${formatWhen(meta.lastSyncedAt)}` : "";
 
   $("syncModeInfo").textContent = autoSyncEnabled()
-    ? "Changes upload about 30 seconds after your last edit, and again when you come back online."
+    ? "Changes upload about 30 seconds after your last edit while you are signed in. After a while Google asks you to sign in again with one tap."
     : "Nothing is uploaded until you press Sync Now, tap the Sync button, or tap the sync status in the sidebar.";
 
   // Quick sync button for phones: only when there is something to do
@@ -147,6 +149,14 @@ function renderUI() {
   pill.disabled = syncing;
   pill.classList.toggle("is-syncing", syncing);
   $("syncPillLabel").textContent = PILL_LABEL[key] || "Sync";
+}
+
+// Without a valid Google sign-in nothing is tried in the background: just ask for a tap
+function markNeedsSignIn() {
+  if (!lastIssue) {
+    lastIssue = { kind: "auth", state: "reconnect", message: STATES.reconnect.message };
+  }
+  renderUI();
 }
 
 /* ---------- Errors ---------- */
@@ -166,6 +176,7 @@ function describeError(err) {
 function handleError(err, interactive) {
   console.error("Sync failed", err);
   const code = err && err.code;
+  if (!interactive) blockedUntil = Date.now() + RETRY_COOLDOWN_MS; // no quick retries in the background
 
   if (AUTH_CODES.has(code)) {
     lastIssue = {
@@ -374,6 +385,16 @@ async function runSync({ interactive = false } = {}) {
   const wasConnected = Boolean(loadMeta().connected);
   if (!wasConnected && !interactive) return;
 
+  // Background syncs never open Google's sign-in: they only run with a valid sign-in,
+  // and wait after a failure. Anything else needs a tap from you.
+  if (!interactive) {
+    if (Date.now() < blockedUntil) return;
+    if (!hasAccessToken()) {
+      markNeedsSignIn();
+      return;
+    }
+  }
+
   if (!isGoogleConfigured()) {
     lastIssue = { kind: "error", state: "error", message: "Add your Google Client ID in js/config.js first." };
     renderUI();
@@ -410,7 +431,11 @@ async function runSync({ interactive = false } = {}) {
 function scheduleSync(delay = AUTO_DELAY_MS) {
   clearTimeout(timer);
   if (!autoSyncEnabled() || !loadMeta().connected || lastIssue) return;
-  timer = setTimeout(() => runSync({ interactive: false }), delay);
+  timer = setTimeout(() => {
+    // things may have changed while waiting
+    if (lastIssue || !autoSyncEnabled() || !loadMeta().connected) return;
+    runSync({ interactive: false });
+  }, delay);
 }
 
 function onDataChange() {
@@ -499,5 +524,8 @@ export function initSync() {
   });
 
   renderUI();
-  if (loadMeta().connected && autoSyncEnabled()) runSync({ interactive: false });
+
+  // Opening the app never syncs and never opens a Google popup.
+  // Automatic mode with changes waiting just shows "Sign in to sync".
+  if (loadMeta().connected && autoSyncEnabled() && pendingChanges()) markNeedsSignIn();
 }

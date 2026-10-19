@@ -1,7 +1,9 @@
 import { GOOGLE_CLIENT_ID, DRIVE_SCOPE } from "./config.js";
 
+const SIGN_IN_TIMEOUT_MS = 120_000; // a sign-in popup that never answers is dropped after this long
+
 let tokenClient = null;
-let pending = null; // { resolve, reject } for the sign-in currently in progress
+let pending = null; // { resolve, reject, timer } for the sign-in currently in progress
 let accessToken = null;
 let expiresAt = 0;
 
@@ -36,6 +38,15 @@ function loadGisScript() {
   });
 }
 
+// Takes the sign-in that is in progress (if any) and stops its timer
+function takePending() {
+  if (!pending) return null;
+  const p = pending;
+  pending = null;
+  clearTimeout(p.timer);
+  return p;
+}
+
 async function getTokenClient() {
   await loadGisScript();
   if (!tokenClient) {
@@ -43,19 +54,16 @@ async function getTokenClient() {
       client_id: GOOGLE_CLIENT_ID,
       scope: DRIVE_SCOPE,
       callback: (resp) => {
-        if (!pending) return;
-        const p = pending;
-        pending = null;
+        const p = takePending();
+        if (!p) return;
         if (resp.error) return p.reject(authError(resp.error));
         accessToken = resp.access_token;
         expiresAt = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
         p.resolve(accessToken);
       },
       error_callback: (err) => {
-        if (!pending) return;
-        const p = pending;
-        pending = null;
-        p.reject(authError((err && err.type) || "unknown"));
+        const p = takePending();
+        if (p) p.reject(authError((err && err.type) || "unknown"));
       },
     });
   }
@@ -64,17 +72,27 @@ async function getTokenClient() {
 
 /**
  * Returns a valid access token.
- * interactive: true  -> may open Google's sign-in popup (call from a button click)
- * interactive: false -> never shows UI; fails if sign-in is needed
+ * interactive: true  -> may open Google's sign-in popup (call it from a button tap)
+ * interactive: false -> never opens anything; fails if there is no valid token.
+ *   (A silent attempt makes the popup flash open and closed on phones, so background
+ *   work never tries it: signing in always needs a tap.)
  */
 export async function requestAccessToken({ interactive = true } = {}) {
   if (hasAccessToken()) return accessToken;
+  if (!interactive) throw authError("interaction_required");
   if (pending) throw authError("busy");
 
   const client = await getTokenClient();
   return new Promise((resolve, reject) => {
-    pending = { resolve, reject };
-    client.requestAccessToken({ prompt: interactive ? "" : "none" });
+    const timer = setTimeout(() => {
+      if (pending && pending.timer === timer) {
+        pending = null;
+        reject(authError("popup_closed"));
+      }
+    }, SIGN_IN_TIMEOUT_MS);
+
+    pending = { resolve, reject, timer };
+    client.requestAccessToken({ prompt: "" });
   });
 }
 
